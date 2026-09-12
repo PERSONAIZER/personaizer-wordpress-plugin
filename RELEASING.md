@@ -38,9 +38,8 @@ alongside it is a hard rejection).
   explicitly in your reply during review — changing it silently isn't possible once approved.
 
 > PERSONAIZER connects a WordPress / WooCommerce site to a PERSONAIZER AI persona in one click. It
-> embeds a floating chat widget and, optionally, an AI-powered search box, both answering from the
-> site's own pages, posts and WooCommerce products, and can keep that content synced to the persona
-> so answers stay current.
+> embeds a floating chat widget answering from the site's own pages, posts and WooCommerce products,
+> and can keep that content synced to the persona so answers stay current.
 >
 > PERSONAIZER is an external SaaS (https://personaizer.com). This plugin is a client for it: chat runs
 > against the PERSONAIZER API and the widget script is served from PERSONAIZER's CDN. A free plan exists,

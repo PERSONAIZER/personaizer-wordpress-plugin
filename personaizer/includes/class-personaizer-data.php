@@ -39,6 +39,10 @@ class Personaizer_Data {
         'personaizer_title',
         'personaizer_auto_open',
         'personaizer_nudge',
+        // Legacy AI Search (removed in 1.3.0 with the Search API) — same reason as above.
+        'personaizer_search_enabled',
+        'personaizer_search_mode',
+        'personaizer_search_selector',
     ];
 
     /** Scheduled hooks the plugin owns. */
