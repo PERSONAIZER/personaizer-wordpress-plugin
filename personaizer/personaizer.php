@@ -3,7 +3,7 @@
  * Plugin Name: PERSONAIZER
  * Plugin URI:  https://personaizer.com/wordpress
  * Description: Add the PERSONAIZER AI chat widget to your WordPress site in one click. Enter your Persona ID and go live — no coding required.
- * Version:     1.3.0
+ * Version:     1.3.1
  * Requires at least: 5.6
  * Requires PHP: 7.4
  * Author:      PERSONAIZER
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * the header would be wasted work. build-zip.sh refuses to package when the constant, the header and
  * readme.txt's Stable tag disagree, so the copy cannot drift in silence.
  */
-define( 'PERSONAIZER_VERSION', '1.3.0' );
+define( 'PERSONAIZER_VERSION', '1.3.1' );
 define( 'PERSONAIZER_PLUGIN_FILE', __FILE__ );
 
 /**
@@ -2092,6 +2092,11 @@ add_action( 'wp_footer', function () {
     // Steer the widget's /v1 calls at our configured gateway (overrides the base baked into chat.js
     // at upload time) so it works against any environment — like the dashboard's own web widget.
     $cfg['apiBase'] = rtrim( PERSONAIZER_WIDGET_API_BASE, '/' );
+
+    // Tell PERSONAIZER the widget is running inside this plugin, so conversations show as "WordPress" in the
+    // owner's inbox instead of a generic website embed. Purely descriptive — the server only accepts its own
+    // short allowlist for this key and never treats it as a credential.
+    $cfg['integration'] = 'wordpress';
 
     // Recognize a signed-in customer (opt-in + Identity Secret set). Split in two for cache safety:
     //   • userAttributes (name/email — display only) are baked into the boot config so chat.js captures

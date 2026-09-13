@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -125,6 +125,9 @@ In WordPress it stores only options: your Persona ID, your secret API key, your 
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 1.3.1 =
+* Conversations started from your site now show as "WordPress" in the PERSONAIZER inbox and analytics, instead of a generic website embed. Nothing about what is sent changes — the widget just tells PERSONAIZER which plugin it is running in.
 
 = 1.3.0 =
 * AI Search has been removed. PERSONAIZER no longer offers the search product it was built on, so the "Let visitors search with AI" setting, the `[personaizer_search]` shortcode and the search box are gone. If a page still contains the shortcode, remove it from that page. Chat and content syncing are unchanged.
