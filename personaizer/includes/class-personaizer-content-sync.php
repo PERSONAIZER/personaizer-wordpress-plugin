@@ -1,24 +1,22 @@
 <?php
 /**
- * General WordPress content sync → PERSONAIZER general knowledge.
+ * General WordPress content sync → the site's connector lanes on PERSONAIZER.
  *
- * Pushes selected post types (posts / pages / public CPTs) into the persona's
- * null-schema "general knowledge" lane so the AI knows the whole site. Products
- * (WooCommerce) are handled separately by the typed catalog mapper (Phase 2).
+ * Pushes posts / pages / public custom post types into their lane (one lane per post type; the backend
+ * files each lane into its own source). Products (WooCommerce) are handled separately by the typed catalog
+ * mapper.
  *
  * Mechanism: WordPress hooks (never raw DB / polling).
  *   - wp_after_insert_post  → create/update  (fires AFTER meta+terms are saved,
  *                             unlike raw save_post which fires before)
- *   - trashed_post / before_delete_post → remove; or, when the lane is frozen,
+ *   - trashed_post / before_delete_post → remove; or, when the lane is off,
  *                             remember it for the resume (see remember_removal)
- *   - daily WP-Cron reconcile → deliberately a no-op; see reconcile()
+ *   - the daily tick (Personaizer_Manifest) → the lane manifest catches whatever the hooks missed
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Personaizer_Content_Sync {
-
-    const RECONCILE_HOOK = 'personaizer_reconcile';
 
     /** @var Personaizer_Api */
     private $api;
@@ -29,40 +27,21 @@ class Personaizer_Content_Sync {
         add_action( 'wp_after_insert_post', [ $this, 'on_post_saved' ], 20, 4 );
         add_action( 'trashed_post', [ $this, 'on_post_removed' ] );
         add_action( 'before_delete_post', [ $this, 'on_post_removed' ] );
-        add_action( self::RECONCILE_HOOK, [ $this, 'reconcile' ] );
-
-        if ( ! wp_next_scheduled( self::RECONCILE_HOOK ) ) {
-            wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::RECONCILE_HOOK );
-        }
     }
 
-    /** Called from the plugin's register_deactivation_hook. */
-    public static function on_deactivate() {
-        wp_clear_scheduled_hook( self::RECONCILE_HOOK );
-    }
-
-    /** Post types the site owner opted into syncing. */
+    /** Post types whose lane the owner switched on (read from the connector, never from a local option). */
     private function enabled_types() {
-        $types = get_option( 'personaizer_sync_post_types', [] );
-        return is_array( $types ) ? array_values( array_filter( array_map( 'sanitize_key', $types ) ) ) : [];
+        $types = array();
+        $lanes = personaizer_lanes();
+        foreach ( personaizer_current_lanes() as $lane ) {
+            if ( $lane !== 'products' && isset( $lanes[ $lane ] ) ) $types[] = $lanes[ $lane ]['post_type'];
+        }
+        return $types;
     }
 
     /** Stable, URL-safe external id — the key the upsert dedupes/updates on. */
     private function external_id( WP_Post $post ) {
         return 'wp-' . $post->post_type . '-' . $post->ID;
-    }
-
-    /**
-     * The source key this post pushes into — per LANE, not per site (see personaizer_lanes()). Pages keep the
-     * bare host; posts get their own key. That is what lets an owner stop their AI using the blog while it
-     * keeps answering from their pages, instead of the all-or-nothing a shared key forces.
-     *
-     * Null for a post type we don't sync — the callers already gate on enabled_types(), so this is a guard,
-     * not a branch anyone reaches.
-     */
-    private function source_for( WP_Post $post ) {
-        $lane = personaizer_lane_for_post_type( $post->post_type );
-        return $lane ? personaizer_lane_source( $lane ) : null;
     }
 
     /**
@@ -78,7 +57,7 @@ class Personaizer_Content_Sync {
         if ( ! $post ) return;
 
         if ( ! in_array( $post->post_type, $this->enabled_types(), true ) ) {
-            // Lane frozen. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the post
+            // Lane off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the post
             // as it stands then. An UNPUBLISH does: that walk only visits published posts, so it is exactly
             // blind to this, and the doc would outlive the page forever.
             if ( $post->post_status !== 'publish' ) {
@@ -101,7 +80,7 @@ class Personaizer_Content_Sync {
         if ( ! $post ) return;
         $this->forget( $post );
         // Always queued, never sent inline — see personaizer_arm_removal_flush() for why bulk deletes
-        // make a per-post API call unsafe. A frozen lane took this path already; now every removal does.
+        // make a per-post API call unsafe. A lane that is off took this path already; now every removal does.
         $this->remember_removal( $post );
     }
 
@@ -139,20 +118,20 @@ class Personaizer_Content_Sync {
     /**
      * The exact payload this post would be pushed as — no request, no side effects.
      *
-     * Reconciliation fingerprints THIS rather than the post row, so the comparison is against what the AI
-     * would actually receive: rendered content (shortcodes and blocks expanded, tags stripped) and the
+     * The lane manifest fingerprints THIS rather than the post row, so the comparison is against what the
+     * AI actually received: rendered content (shortcodes and blocks expanded, tags stripped) and the
      * resolved image URLs. A theme or plugin that changes how content renders therefore shows up as
      * "out of date", which reading post_modified alone would never reveal.
      *
      * @return array|null Null for a post type with no lane (nothing would be sent).
      */
     public function payload_for( WP_Post $post ) {
-        $source = $this->source_for( $post );
-        if ( ! $source ) return null;
+        $lane = personaizer_lane_for_post_type( $post->post_type );
+        if ( ! isset( personaizer_lanes()[ $lane ] ) ) return null;
         return array(
             'id'        => $this->external_id( $post ),
+            'lane'      => $lane,
             'title'     => $this->post_title( $post ),
-            'source'    => $source,
             'markdown'  => $this->render_content( $post ),
             'permalink' => get_permalink( $post ),
             'images'    => $this->collect_images( $post ),
@@ -165,42 +144,42 @@ class Personaizer_Content_Sync {
         if ( $payload === null ) {
             return false;
         }
-        $source = $payload['source'];
+        $lane   = $payload['lane'];
+        $ext    = $payload['id'];
         $result = $this->api->upsert_text(
-            $payload['id'],
+            $lane,
+            $ext,
             $payload['title'],
-            $source,
             $payload['markdown'],
+            personaizer_payload_hash( $payload ),
             $payload['permalink'],
             $payload['images']
         );
 
-        $lane       = personaizer_lane_for_post_type( $post->post_type );
-        $known_lane = isset( personaizer_lanes()[ $lane ] );
         if ( is_wp_error( $result ) ) {
+            if ( Personaizer_Api::is_lane_closed( $result ) ) {
+                // The owner shut this lane on personaizer.com (or disconnected). Not a failure of this post:
+                // drop it from every queue rather than retry a closed door on each edit.
+                personaizer_forget_overflow( $lane, array( $ext ) );
+                personaizer_forget_retry( $lane, array( $ext ) );
+                return false;
+            }
             // The plan being full isn't "this post is broken" — remember it so the after-upgrade catch-up
             // replays it. Anything else is a real failure, and it gets remembered too: a transient timeout
             // or a one-off rejection used to be logged and then forgotten, which is how a site ends up
             // permanently reading "4 of 5 pages" with no way back short of a manual Resync. Queued here, it
             // is re-tried on every catch-up tick until it lands.
-            if ( $known_lane ) {
-                if ( Personaizer_Api::is_quota_error( $result ) ) {
-                    personaizer_remember_overflow( $lane, $this->external_id( $post ), $post->ID );
-                } else {
-                    personaizer_remember_retry( $lane, $this->external_id( $post ), $post->ID );
-                }
+            if ( Personaizer_Api::is_quota_error( $result ) ) {
+                personaizer_remember_overflow( $lane, $ext, $post->ID );
+            } else {
+                personaizer_remember_retry( $lane, $ext, $post->ID );
             }
             personaizer_debug_log( 'content sync failed for post ' . $post->ID . ': ' . $result->get_error_message() );
             return false;
         }
         // Landed — if it had been waiting for plan space or a retry, it isn't anymore.
-        if ( $known_lane ) {
-            personaizer_forget_overflow( $lane, array( $this->external_id( $post ) ) );
-            personaizer_forget_retry( $lane, array( $this->external_id( $post ) ) );
-        }
-        // Remember WHAT landed, so a later comparison can distinguish "already correct" from
-        // "present but out of date" — the difference a doc count can never show.
-        personaizer_record_sync_hash( $post->ID, personaizer_payload_hash( $payload ) );
+        personaizer_forget_overflow( $lane, array( $ext ) );
+        personaizer_forget_retry( $lane, array( $ext ) );
         return true;
     }
 
@@ -264,8 +243,8 @@ class Personaizer_Content_Sync {
     }
 
     /**
-     * Push the given post ids. The batch entry point for Personaizer_Backfill — it owns the paging,
-     * this owns how one post becomes a knowledge doc.
+     * Push the given post ids. The batch entry point for Personaizer_Backfill and the manifest walk — they
+     * own the paging, this owns how one post becomes a knowledge doc.
      *
      * @param int[] $ids
      * @return int the number actually pushed.
@@ -287,33 +266,5 @@ class Personaizer_Content_Sync {
             if ( $this->sync_post( $post ) ) $count++;
         }
         return $count;
-    }
-
-    /**
-     * Deliberately empty — and staying that way. This is a decision, not a to-do.
-     *
-     * The plan was: list our source's docs, drop every external-id with no matching published post. The
-     * gap it aimed at — a removal while a lane was frozen — is now closed exactly, by remember_removal()
-     * recording the event WordPress already hands us. What a reconcile would still add is only the case we
-     * cannot witness at all (the plugin deactivated mid-delete), and that is not worth what it costs:
-     *
-     *   - It infers deletion from "what the site has", and that list under-reports in ways we don't
-     *     control. WPML forces suppress_filters off, so get_posts() answers for ONE language; deactivating
-     *     WooCommerce unregisters `product` outright. Either turns a routine sweep into a mass delete,
-     *     because every doc the query failed to mention looks like an orphan. Note the same query is
-     *     harmless in Personaizer_Backfill — under-reporting there just under-pushes, and the next edit
-     *     repairs it. Identical code, opposite blast radius.
-     *   - A lane's source is not ours alone. It also holds docs the owner uploaded by hand in the dashboard
-     *     (external_id NULL) and pages the onboarding harvest scraped under the same bare host
-     *     (doc-<slug>-<hash>, see WebsiteSourceHelpers). "No matching published post" is true of every one
-     *     of them. The hand-uploaded files would go first, and nothing can re-sync those back.
-     *
-     * Deletion is not reversible on our side — Core hard-deletes via a bulk job. If this is ever revisited,
-     * the rails are not optional: act only on ids carrying this plugin's own prefixes (wp-<type>-<id> /
-     * wc-product-<id>), never sweep from an enumeration that can't be proven complete, and require a second
-     * confirming run before removing anything.
-     */
-    public function reconcile() {
-        // Intentionally empty — see docblock. Removals are recorded when they happen, never deduced later.
     }
 }

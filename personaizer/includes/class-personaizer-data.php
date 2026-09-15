@@ -17,29 +17,42 @@ class Personaizer_Data {
     /** Every option the plugin persists in wp_options. */
     const OPTIONS = [
         // Connection — provisioned by Connect.
+        'personaizer_connector_id',
+        'personaizer_connector_key',
+        'personaizer_brand_id',
         'personaizer_persona_id',
-        'personaizer_secret_key',
         'personaizer_identity_secret',
         'personaizer_identify_users',
-        'personaizer_connected_at',
-        // What to sync + how it's going.
-        'personaizer_sync_post_types',
-        'personaizer_sync_products',
+        // What personaizer.com last said about the connector, and how syncing is going.
+        'personaizer_connector_state',
         'personaizer_backfill_state',
+        'personaizer_manifest_state',
+        'personaizer_manifest_result',
         'personaizer_pending_removals',
         'personaizer_pending_overflow',
         'personaizer_pending_retry',
         'personaizer_last_sync',
         'personaizer_last_error',
-        // Legacy appearance/behavior — no longer settings (they live on the persona now, in its Widget
-        // tab). Still listed so an upgraded install doesn't leave orphaned rows behind.
+    ];
+
+    /**
+     * Options earlier releases stored and this one doesn't. Cleared on connect, disconnect and uninstall so
+     * an upgraded install never carries a credential or a setting that nothing reads any more.
+     */
+    const RETIRED_OPTIONS = [
+        // 1.x: the persona's secret key did the syncing; 2.0 syncs with the connector key.
+        'personaizer_secret_key',
+        'personaizer_connected_at',
+        // 1.x: which lanes sync was a local setting; 2.0 reads it from the connector.
+        'personaizer_sync_post_types',
+        'personaizer_sync_products',
+        // < 1.3: appearance/behavior (now on the persona's Widget tab) and AI Search.
         'personaizer_position',
         'personaizer_theme',
         'personaizer_accent',
         'personaizer_title',
         'personaizer_auto_open',
         'personaizer_nudge',
-        // Legacy AI Search (removed in 1.3.0 with the Search API) — same reason as above.
         'personaizer_search_enabled',
         'personaizer_search_mode',
         'personaizer_search_selector',
@@ -47,8 +60,15 @@ class Personaizer_Data {
 
     /** Scheduled hooks the plugin owns. */
     const CRONS = [
-        'personaizer_reconcile',
+        'personaizer_daily',
         'personaizer_backfill',
+        'personaizer_manifest',
+        'personaizer_catch_up',
+    ];
+
+    /** Scheduled hooks earlier releases owned — cleared alongside, for the same reason as RETIRED_OPTIONS. */
+    const RETIRED_CRONS = [
+        'personaizer_reconcile',
         'personaizer_overflow_catchup',
     ];
 
@@ -65,13 +85,22 @@ class Personaizer_Data {
         foreach ( self::CRONS as $hook ) {
             wp_clear_scheduled_hook( $hook );
         }
-        // Per-item sync fingerprints (Personaizer_Reconcile::META_HASH). Written as post meta on every
-        // synced product/page, so unlike the options above there is one per item — a disconnected site
-        // would otherwise carry thousands of rows describing a connection it no longer has. Spelled
-        // literally rather than via the class constant: uninstall.php runs outside the plugin's normal
-        // bootstrap, where that class isn't necessarily loaded.
-        delete_post_meta_by_key( '_personaizer_sync_hash' );
+        self::clear_retired();
         self::clear_transients();
+    }
+
+    /** Remove what earlier releases left on this site (see RETIRED_OPTIONS). */
+    public static function clear_retired() {
+        foreach ( self::RETIRED_OPTIONS as $option ) {
+            delete_option( $option );
+        }
+        foreach ( self::RETIRED_CRONS as $hook ) {
+            wp_clear_scheduled_hook( $hook );
+        }
+        // 1.x kept a per-item sync fingerprint as post meta on every synced product/page; 2.0 keeps the
+        // fingerprint on the backend. One row per item, so an upgraded site would otherwise carry
+        // thousands of rows nothing reads.
+        delete_post_meta_by_key( '_personaizer_sync_hash' );
     }
 
     /**

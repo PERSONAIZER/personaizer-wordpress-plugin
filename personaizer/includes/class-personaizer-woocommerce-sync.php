@@ -4,10 +4,9 @@
  *
  * Detection-gated (only wired when WooCommerce is active). Each product maps to a
  * typed knowledge item — price / original price / stock / SKU / attributes / images —
- * pushed via PUT /v1/knowledge/docs, so the AI can filter and recommend ("in stock
- * under 50?") rather than read flat text. Products share the site's source (the store);
- * their category is what routes them to the typed lane, unlike the null-category
- * general-content lane (handled by Personaizer_Content_Sync).
+ * pushed into the connector's `products` lane (PUT /v1/connector/lanes/products/docs),
+ * so the AI can filter and recommend ("in stock under 50?") rather than read flat text.
+ * Pages, posts and custom types are their own lanes (Personaizer_Content_Sync).
  *
  * Mechanism: WooCommerce CRUD hooks (never raw DB / polling).
  *   - woocommerce_update_product / woocommerce_new_product → create/update
@@ -19,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Personaizer_WooCommerce_Sync {
 
-    const OPTION     = 'personaizer_sync_products';
+    const LANE       = 'products';
     const MAX_BATCH  = 100;
     const MAX_IMAGES = 15;
 
@@ -37,9 +36,9 @@ class Personaizer_WooCommerce_Sync {
         add_action( 'before_delete_post', [ $this, 'on_post_removed' ] );
     }
 
-    /** The owner turned product catalog sync on. */
+    /** The owner switched the Products lane on (on personaizer.com — read from the connector). */
     private function enabled() {
-        return get_option( self::OPTION, '' ) === '1';
+        return in_array( self::LANE, personaizer_current_lanes(), true );
     }
 
     /** Sync only when enabled, keyed, and WooCommerce's product API is available. */
@@ -53,18 +52,6 @@ class Personaizer_WooCommerce_Sync {
     }
 
     /**
-     * The store's source key — its OWN lane, separate from the site's pages and posts (see
-     * personaizer_lanes()). A source is the unit a persona switches on and off, so sharing one key with the
-     * content lanes made "stop using my products, keep my pages" impossible to express: unticking Products
-     * could only stop the sync, and the AI kept selling from the catalog it already had.
-     *
-     * Same brand as the content lanes — one shop, one logo (see PERSONAIZER_BRAND_KEY on the push).
-     */
-    private function source() {
-        return personaizer_lane_source( 'products' );
-    }
-
-    /**
      * A product was created/updated. Only published products belong in the catalog
      * knowledge — anything else (draft, private, pending) is removed.
      * NOTE: also fires on stock writes; the typed upsert is idempotent so replays are cheap.
@@ -73,7 +60,7 @@ class Personaizer_WooCommerce_Sync {
         if ( ! $this->api->is_configured() ) return;
         if ( wp_is_post_revision( $product_id ) ) return;
 
-        // Lane frozen. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the product.
+        // Lane off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the product.
         // An UNPUBLISH does: that walk only visits published products, so it is exactly blind to this, and
         // the doc would outlive the product forever. get_post_status keeps this off wc_get_product, because
         // every purchase in the shop reaches here via the stock hooks.
@@ -97,8 +84,15 @@ class Personaizer_WooCommerce_Sync {
         }
 
         $item   = $this->map_product( $product );
-        $result = $this->api->upsert_products( [ $item ] );
+        $result = $this->api->upsert_products( self::LANE, [ $item ] );
         if ( is_wp_error( $result ) ) {
+            // The owner shut the lane on personaizer.com (or disconnected): not this product's failure, and
+            // not something to retry on every save. Drop it from the queues; the next connector read decides.
+            if ( Personaizer_Api::is_lane_closed( $result ) ) {
+                personaizer_forget_overflow( 'products', [ $this->external_id( $product_id ) ] );
+                personaizer_forget_retry( 'products', [ $this->external_id( $product_id ) ] );
+                return;
+            }
             // Plan full (402, nothing fit) → remember for the after-upgrade replay; anything else is a real
             // failure and gets queued for retry. Without that, a single save that happened to hit a timeout
             // left the AI holding a stale copy of that product with nothing scheduled to correct it.
@@ -118,9 +112,6 @@ class Personaizer_WooCommerce_Sync {
         } else {
             personaizer_forget_overflow( 'products', [ $ext ] );
             personaizer_forget_retry( 'products', [ $ext ] );
-            // Landed — remember WHAT landed, so a later comparison can tell "already correct" from
-            // "looks present but is out of date". Without this an item is only ever known to exist.
-            personaizer_record_sync_hash( $product_id, personaizer_payload_hash( $item ) );
         }
     }
 
@@ -158,15 +149,18 @@ class Personaizer_WooCommerce_Sync {
     /**
      * The exact item this product would be pushed as — no request, no side effects.
      *
-     * Reconciliation fingerprints THIS, not the WooCommerce row, so the comparison is against what the AI
-     * would actually receive. That is what lets a change in the mapper itself (a bug fix that starts
-     * emitting a previously-dropped attribute) register as "out of date" rather than staying invisible.
+     * The lane manifest fingerprints THIS, not the WooCommerce row, so the comparison is against what the
+     * AI actually received. That is what lets a change in the mapper itself (a bug fix that starts emitting
+     * a previously-dropped attribute) register as "out of date" rather than staying invisible.
      */
     public function payload_for( WC_Product $product ) {
         return $this->map_product( $product );
     }
 
-    /** Map a WooCommerce product to a typed knowledge item. */
+    /**
+     * Map a WooCommerce product to a typed knowledge item. The item carries its own `fingerprint` (the hash
+     * of everything else in it), which the backend stores and the lane manifest compares.
+     */
     private function map_product( WC_Product $product ) {
         $id    = $product->get_id();
         $paths = $this->category_paths( $product );
@@ -183,10 +177,6 @@ class Personaizer_WooCommerce_Sync {
             'id'          => $this->external_id( $id ),
             'title'       => $product->get_name(),
             'description' => $this->description( $product ),
-            'source'      => $this->source(),
-            // Its own source (so products switch off independently) but the SAME brand as the site's pages
-            // and posts — one shop, one logo.
-            'brand'       => personaizer_source_key(),
             'categories'  => $paths,
             'currency'    => get_woocommerce_currency(),
             'attributes'  => $attributes,
@@ -208,6 +198,7 @@ class Personaizer_WooCommerce_Sync {
             // doc-level (see attributes()).
             $item['variants'] = array( $this->simple_variant( $product ) );
         }
+        $item['fingerprint'] = personaizer_payload_hash( $item );
         return $item;
     }
 
@@ -562,8 +553,16 @@ class Personaizer_WooCommerce_Sync {
      * @return int items pushed (0 on failure — a failed batch must not count as synced).
      */
     private function push( array $batch, array $post_ids = array() ) {
-        $res = $this->api->upsert_products( $batch );
+        $res = $this->api->upsert_products( self::LANE, $batch );
         if ( is_wp_error( $res ) ) {
+            // The lane is shut on personaizer.com — nothing in this batch is owed a retry.
+            if ( Personaizer_Api::is_lane_closed( $res ) ) {
+                $exts = array();
+                foreach ( $post_ids as $pid ) $exts[] = $this->external_id( $pid );
+                personaizer_forget_overflow( 'products', $exts );
+                personaizer_forget_retry( 'products', $exts );
+                return 0;
+            }
             // Whole-batch failure. A quota error here means NOTHING fit (402) → remember the whole batch
             // for the after-upgrade replay; any other error is a real failure to log.
             if ( Personaizer_Api::is_quota_error( $res ) ) {
@@ -592,10 +591,6 @@ class Personaizer_WooCommerce_Sync {
                 personaizer_remember_overflow( 'products', $ext, $pid );
             } else {
                 $landed[] = $ext;
-                // $batch is built parallel to $post_ids by sync_ids(), so index i is this product's item.
-                if ( isset( $batch[ $i ] ) ) {
-                    personaizer_record_sync_hash( $pid, personaizer_payload_hash( $batch[ $i ] ) );
-                }
             }
         }
         if ( $landed ) {
@@ -624,9 +619,16 @@ class Personaizer_WooCommerce_Sync {
             $pid = isset( $post_ids[ $i ] ) ? (int) $post_ids[ $i ] : 0;
             $ext = $pid ? $this->external_id( $pid ) : ( isset( $item['id'] ) ? $item['id'] : '' );
 
-            $res = $this->api->upsert_products( array( $item ) );
+            $res = $this->api->upsert_products( self::LANE, array( $item ) );
 
             if ( is_wp_error( $res ) ) {
+                if ( Personaizer_Api::is_lane_closed( $res ) ) {
+                    if ( $ext !== '' ) {
+                        personaizer_forget_overflow( 'products', array( $ext ) );
+                        personaizer_forget_retry( 'products', array( $ext ) );
+                    }
+                    return $landed;   // the lane is shut for every item that follows too
+                }
                 // Quota is not brokenness — it belongs in the overflow queue, which replays after an
                 // upgrade. Everything else goes to the retry queue, which replays unconditionally.
                 if ( Personaizer_Api::is_quota_error( $res ) ) {
@@ -647,7 +649,6 @@ class Personaizer_WooCommerce_Sync {
                 personaizer_forget_overflow( 'products', array( $ext ) );
                 personaizer_forget_retry( 'products', array( $ext ) );
             }
-            personaizer_record_sync_hash( $pid, personaizer_payload_hash( $item ) );
             $landed++;
         }
         return $landed;

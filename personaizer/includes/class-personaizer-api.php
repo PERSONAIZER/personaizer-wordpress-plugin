@@ -1,10 +1,14 @@
 <?php
 /**
- * Thin HTTP client for the PERSONAIZER knowledge API.
+ * Thin HTTP client for the PERSONAIZER connector API.
  *
- * Uses the persona's SECRET key (pa_…) in the X-Api-Key header — this is
- * server-side only and must never be printed into a page (unlike the public
- * Persona ID that drives the widget).
+ * Authenticates with the CONNECTOR key (ck_…) that Connect handed this site — the credential of this site's
+ * connector on personaizer.com, which owns the knowledge lanes it syncs. Server-side only; it must never be
+ * printed into a page (the widget uses the public Persona ID instead).
+ *
+ * Every write goes to a LANE: /v1/connector/lanes/{lane}/… — the backend files it into that lane's source.
+ * The plugin never names a source; which lanes are on is the owner's choice on personaizer.com, read back
+ * from GET /v1/connector.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -20,14 +24,17 @@ if ( ! defined( 'PERSONAIZER_API_URL' ) ) {
 
 class Personaizer_Api {
 
-    /** @return string|null the secret pa_ key, or null when not configured. */
-    private function secret_key() {
-        $key = trim( (string) get_option( 'personaizer_secret_key', '' ) );
+    /** How long a connector read is trusted before the next call re-reads it. */
+    const CONNECTOR_TTL = MINUTE_IN_SECONDS;
+
+    /** @return string|null the connector key, or null when not connected. */
+    private function connector_key() {
+        $key = trim( (string) get_option( 'personaizer_connector_key', '' ) );
         return $key !== '' ? $key : null;
     }
 
     public function is_configured() {
-        return $this->secret_key() !== null;
+        return $this->connector_key() !== null;
     }
 
     private function base() {
@@ -35,9 +42,20 @@ class Personaizer_Api {
     }
 
     /**
+     * Headers every connector call carries. The plugin version lets the backend see which release a site
+     * runs — the one fact support needs first when a sync misbehaves.
+     */
+    private function headers( array $extra = array() ) {
+        return array_merge( array(
+            'X-Api-Key'                   => $this->connector_key(),
+            'X-Personaizer-Plugin-Version' => PERSONAIZER_VERSION,
+        ), $extra );
+    }
+
+    /**
      * The connected persona's public display info (name + avatar), so the admin screen can say
      * "Ana is live on your site" instead of printing a GUID at the owner. Identified by the PUBLIC
-     * Persona ID — no secret key involved, which is why this works even before a sync key exists.
+     * Persona ID — no key involved.
      *
      * Cached, because this runs on every admin page view — but for how long depends on what came
      * back. A persona still named after the domain is mid-build (the onboarding job renames it to the
@@ -46,7 +64,7 @@ class Personaizer_Api {
      * placeholder is held briefly and a finished persona is held long — the poll converges, and a
      * settled site still costs one request per 5 minutes.
      *
-     * @return array{name:string,avatar_url:string}|null null when unconfigured or unreachable.
+     * @return array{name:string,avatar_url:string,building:bool,stage:string}|null null when there is no widget persona or it is unreachable.
      */
     public function get_profile() {
         $persona_id = trim( (string) get_option( 'personaizer_persona_id', '' ) );
@@ -60,7 +78,7 @@ class Personaizer_Api {
 
         $response = wp_remote_get( $this->base() . '/v1/persona/profile', [
             'timeout' => 8,
-            'headers' => [ 'X-Persona-Id' => $persona_id ],
+            'headers' => [ 'X-Persona-Id' => $persona_id, 'X-Personaizer-Plugin-Version' => PERSONAIZER_VERSION ],
         ] );
 
         $profile = null;
@@ -69,7 +87,7 @@ class Personaizer_Api {
             if ( is_array( $data ) && ! empty( $data['name'] ) ) {
                 $profile = [
                     'name'       => (string) $data['name'],
-                    // The /v1 surface is snake_case (it has no camel->snake interceptor of its own).
+                    // The /v1 surface is snake_case.
                     'avatar_url' => isset( $data['avatar_url'] ) ? (string) $data['avatar_url'] : '',
                     // The server's own answer to "is this persona finished, and what's it doing?" —
                     // not ours to infer. See profile_ttl(): it also decides how long to trust this.
@@ -83,12 +101,8 @@ class Personaizer_Api {
     }
 
     /**
-     * Seconds to trust this answer for.
-     *
-     * Short while the server says the persona is still being built, because during that window nearly
-     * everything about it changes — and the avatar in particular arrives a stage AFTER the name does.
-     * Caching a mid-build answer for minutes is how you end up showing a nameless, pictureless persona
-     * long after it's finished.
+     * Seconds to trust a profile for: short while the server says the persona is still being built (nearly
+     * everything about it changes during that window), long once it has settled.
      */
     private static function profile_ttl( $profile ) {
         if ( $profile === null ) return 5 * MINUTE_IN_SECONDS;
@@ -101,14 +115,104 @@ class Personaizer_Api {
     }
 
     /**
+     * This site's connector as personaizer.com sees it: status, the brand it feeds, and its lanes — each with
+     * `enabled` (the owner's switch), the docs it holds / has ready, and the last manifest's outcome.
+     *
+     * This is the ONLY source of truth for which lanes sync. The owner switches lanes on personaizer.com;
+     * a local copy would be a second truth free to drift, and the plugin would confidently push into a lane
+     * the owner switched off an hour ago. Cached for a minute (it is read on every sync hook), refreshed
+     * outright by forget_connector() after anything that changes it.
+     *
+     * @param bool $force Skip the cache and read live.
+     * @return array{id:string,status:string,brand:array{id:string,slug:string,display_name:string},lanes:array<string,array{enabled:bool,source:string,doc_count:int,ready_count:int,reconciliation:?array}>}|WP_Error
+     */
+    public function get_connector( $force = false ) {
+        $key = $this->connector_key();
+        if ( $key === null ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
+        }
+
+        $cache = 'personaizer_connector_' . md5( $key . '|' . $this->base() );
+        if ( ! $force ) {
+            $hit = get_transient( $cache );
+            if ( is_array( $hit ) ) return $hit;
+        }
+
+        $response = wp_remote_get( $this->base() . '/v1/connector', [ 'timeout' => 15, 'headers' => $this->headers() ] );
+        if ( is_wp_error( $response ) ) return $response;
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        if ( $code < 200 || $code >= 300 ) {
+            return new WP_Error( 'personaizer_http_' . $code, self::friendly_error( $code, wp_remote_retrieve_body( $response ) ), array( 'status' => $code ) );
+        }
+
+        $body      = json_decode( wp_remote_retrieve_body( $response ), true );
+        $connector = ( is_array( $body ) && isset( $body['connector'] ) && is_array( $body['connector'] ) ) ? $body['connector'] : null;
+        if ( $connector === null ) {
+            return new WP_Error( 'personaizer_bad_body', 'PERSONAIZER answered without a connector.' );
+        }
+        $brand = ( isset( $body['brand'] ) && is_array( $body['brand'] ) ) ? $body['brand'] : array();
+
+        $lanes = array();
+        foreach ( (array) ( $connector['lanes'] ?? array() ) as $row ) {
+            if ( empty( $row['lane'] ) ) continue;
+            $lanes[ (string) $row['lane'] ] = array(
+                'enabled'        => ! empty( $row['enabled'] ),
+                'source'         => (string) ( $row['source'] ?? '' ),
+                'doc_count'      => (int) ( $row['doc_count'] ?? 0 ),
+                'ready_count'    => (int) ( $row['ready_count'] ?? 0 ),
+                'reconciliation' => ( isset( $row['reconciliation'] ) && is_array( $row['reconciliation'] ) ) ? $row['reconciliation'] : null,
+            );
+        }
+
+        $state = array(
+            'id'     => (string) ( $connector['id'] ?? '' ),
+            'status' => (string) ( $connector['status'] ?? '' ),
+            'brand'  => array(
+                'id'           => (string) ( $brand['id'] ?? '' ),
+                'slug'         => (string) ( $brand['slug'] ?? '' ),
+                'display_name' => (string) ( $brand['display_name'] ?? '' ),
+            ),
+            'lanes'  => $lanes,
+        );
+        set_transient( $cache, $state, self::CONNECTOR_TTL );
+        return $state;
+    }
+
+    /** Drop the cached connector — after connect, disconnect, or a write the server refused because a lane changed. */
+    public function forget_connector() {
+        $key = $this->connector_key();
+        if ( $key !== null ) delete_transient( 'personaizer_connector_' . md5( $key . '|' . $this->base() ) );
+    }
+
+    /**
+     * Tell personaizer.com what this site could sync — every lane with a label and a count — so the owner
+     * can switch lanes on from a list that reflects the site as it is now (a custom post type registered
+     * last week shows up; one whose plugin was removed does not).
+     *
+     * @param array<int,array{lane:string,label:string,count:int}> $lanes
+     * @return true|WP_Error
+     */
+    public function report_inventory( array $lanes ) {
+        if ( ! $this->is_configured() ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
+        }
+        $response = wp_remote_request( $this->base() . '/v1/connector/inventory', [
+            'method'  => 'PUT',
+            'timeout' => 15,
+            'headers' => $this->headers( [ 'Content-Type' => 'application/json' ] ),
+            'body'    => wp_json_encode( [ 'lanes' => array_values( $lanes ) ] ),
+        ] );
+        return $this->handle_response( $response, 'inventory', false );
+    }
+
+    /**
      * The account's knowledge-unit budget: how much the plan allows, how much is used, and the plan's
      * name — enough to tell the owner "you've hit your Free plan's limit, upgrade" and to gate the
      * after-upgrade catch-up on real headroom before it replays anything.
      *
-     * Read with the SECRET key against /api/subscription/limits — a public-surface endpoint that accepts
-     * a persona key and resolves the owning account from it, so no user login is involved. Cached briefly:
-     * it's consulted on every settings-page render and by the daily catch-up, and a plan's ceiling doesn't
-     * move minute to minute.
+     * Read with the connector key against /api/subscription/limits — a public-surface endpoint that accepts
+     * any of the account's keys and resolves the owning account from it. Cached briefly: it's consulted on
+     * every settings-page render and by the daily catch-up, and a plan's ceiling doesn't move minute to minute.
      *
      * @param bool $force Skip the cache and read live — used by the after-upgrade catch-up, which runs
      *                    rarely and must not act on a stale "full" reading from just before the upgrade.
@@ -116,7 +220,7 @@ class Personaizer_Api {
      *         null when unconfigured or unreachable — a caller must read that as "don't know", never "0".
      */
     public function get_limits( $force = false ) {
-        $key = $this->secret_key();
+        $key = $this->connector_key();
         if ( $key === null ) return null;
 
         $cache = 'personaizer_limits_' . md5( $key . '|' . $this->base() );
@@ -127,15 +231,11 @@ class Personaizer_Api {
             }
         }
 
-        $response = wp_remote_get(
-            $this->base() . '/api/subscription/limits',
-            [ 'timeout' => 10, 'headers' => [ 'X-Api-Key' => $key ] ]
-        );
+        $response = wp_remote_get( $this->base() . '/api/subscription/limits', [ 'timeout' => 10, 'headers' => $this->headers() ] );
 
         $limits = null;
         if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
-            // The /api surface is snake_case on the wire (its own clients rely on a camel->snake
-            // interceptor the plugin doesn't have) — read snake_case keys, as Connect does.
+            // The /api surface is snake_case on the wire.
             $data  = json_decode( wp_remote_retrieve_body( $response ), true );
             $usage = ( is_array( $data ) && isset( $data['usage'] ) && is_array( $data['usage'] ) ) ? $data['usage'] : null;
             $plan  = ( is_array( $data ) && isset( $data['plan'] ) && is_array( $data['plan'] ) ) ? $data['plan'] : array();
@@ -156,16 +256,17 @@ class Personaizer_Api {
     }
 
     /**
-     * Upsert a plain-text / markdown knowledge doc by external id.
+     * Upsert a plain-text / markdown knowledge doc into a lane, by external id.
      * Idempotent server-side: same id updates in place, identical content is a no-op.
      *
-     * @param array $images Image library entries [{url, description, is_primary}]; [] = no images.
+     * @param string $lane        Lane id (pages / posts / a custom post type).
+     * @param string $fingerprint This site's hash of the payload — the lane manifest compares it later.
+     * @param array  $images      Image library entries [{url, description, is_primary}]; [] = no images.
      * @return true|WP_Error
      */
-    public function upsert_text( $external_id, $title, $source, $markdown, $permalink = '', $images = array() ) {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PERSONAIZER secret key is not configured.' );
+    public function upsert_text( $lane, $external_id, $title, $markdown, $fingerprint, $permalink = '', $images = array() ) {
+        if ( ! $this->is_configured() ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
 
         $boundary = wp_generate_password( 24, false );
@@ -179,10 +280,7 @@ class Personaizer_Api {
         $body .= 'Content-Type: text/markdown' . $eol . $eol;
         $body .= $markdown . $eol;
 
-        // brand: this site's lanes (pages / posts / products) are separate sources so each can be switched
-        // off on its own — but they are ONE shop, so they must share one identity. Without this, every lane
-        // would mint its own brand and the owner would have three logos to keep in step.
-        $fields = [ 'id' => $external_id, 'title' => $title, 'source' => $source, 'brand' => personaizer_source_key() ];
+        $fields = [ 'id' => $external_id, 'title' => $title, 'fingerprint' => $fingerprint ];
         if ( $permalink !== '' ) {
             $fields['links'] = wp_json_encode( [ [ 'url' => $permalink, 'is_primary' => true ] ] );
         }
@@ -197,13 +295,10 @@ class Personaizer_Api {
         $body .= '--' . $boundary . '--' . $eol;
 
         $response = wp_remote_post(
-            $this->base() . '/v1/knowledge/docs/upload',
+            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/docs/upload',
             [
                 'timeout' => 30,
-                'headers' => [
-                    'X-Api-Key'    => $key,
-                    'Content-Type' => 'multipart/form-data; boundary=' . $boundary,
-                ],
+                'headers' => $this->headers( [ 'Content-Type' => 'multipart/form-data; boundary=' . $boundary ] ),
                 'body'    => $body,
             ]
         );
@@ -212,73 +307,18 @@ class Personaizer_Api {
     }
 
     /**
-     * Bulk upsert TYPED product docs (1–100) via PUT /v1/knowledge/docs.
-     * Idempotent by each item's `id`; identical content replays as a no-op.
+     * Bulk upsert TYPED product items (1–100) into a lane. Idempotent by each item's `id`; identical
+     * content replays as a no-op. Each item carries its `fingerprint` (see personaizer_payload_hash()).
      *
-     * @param array[] $items Typed items ({id,title,source,categories,price,…}).
+     * @param string  $lane  Lane id — 'products'.
+     * @param array[] $items Typed items ({id, fingerprint, title, categories, price, …} — never a `source`).
      * @return array{deferred:string[]}|WP_Error On success an array whose `deferred` holds the external
      *         ids the plan had no room for (empty = everything landed). WP_Error on failure — a 402 means
      *         nothing fit at all.
      */
-    /**
-     * Every external id the AI currently holds for one source — the remote half of a reconciliation.
-     *
-     * Deliberately does NOT go through handle_response(): that stamps `personaizer_last_sync` on any
-     * successful non-delete call, and a read must never be able to claim the site was just synced.
-     *
-     * @param string $source Lane source key (see personaizer_lane_source()).
-     * @return string[]|WP_Error
-     */
-    public function list_doc_ids( $source ) {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PersonAIzer secret key is not configured.' );
-        }
-
-        $ids    = array();
-        $limit  = 200;   // the endpoint's documented maximum
-        $offset = 0;
-
-        // Bounded: a runaway pager must not hang an admin request. 500 pages = 100k docs, far past any
-        // plan's knowledge allowance, so hitting this cap means something is wrong, not that a site is big.
-        for ( $page = 0; $page < 500; $page++ ) {
-            $url = add_query_arg(
-                array( 'source' => $source, 'limit' => $limit, 'offset' => $offset ),
-                $this->base() . '/v1/knowledge/docs'
-            );
-            $response = wp_remote_get( $url, array(
-                'timeout' => 30,
-                'headers' => array( 'X-Api-Key' => $key ),
-            ) );
-            if ( is_wp_error( $response ) ) return $response;
-
-            $code = (int) wp_remote_retrieve_response_code( $response );
-            if ( $code < 200 || $code >= 300 ) {
-                return new WP_Error(
-                    'personaizer_api_' . $code,
-                    sprintf( 'Could not read the document list (HTTP %d).', $code ),
-                    array( 'status' => $code )
-                );
-            }
-
-            $body  = json_decode( wp_remote_retrieve_body( $response ), true );
-            $items = ( is_array( $body ) && isset( $body['items'] ) && is_array( $body['items'] ) )
-                ? $body['items'] : array();
-
-            foreach ( $items as $item ) {
-                if ( ! empty( $item['id'] ) ) $ids[] = (string) $item['id'];
-            }
-            if ( count( $items ) < $limit ) break;   // short page ⇒ last page
-            $offset += $limit;
-        }
-
-        return $ids;
-    }
-
-    public function upsert_products( array $items ) {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PERSONAIZER secret key is not configured.' );
+    public function upsert_products( $lane, array $items ) {
+        if ( ! $this->is_configured() ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
         $items = array_values( $items );
         if ( empty( $items ) ) {
@@ -286,14 +326,11 @@ class Personaizer_Api {
         }
 
         $response = wp_remote_request(
-            $this->base() . '/v1/knowledge/docs',
+            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/docs',
             [
                 'method'  => 'PUT',
                 'timeout' => 30,
-                'headers' => [
-                    'X-Api-Key'    => $key,
-                    'Content-Type' => 'application/json',
-                ],
+                'headers' => $this->headers( [ 'Content-Type' => 'application/json' ] ),
                 'body'    => wp_json_encode( [ 'items' => $items ] ),
             ]
         );
@@ -313,91 +350,58 @@ class Personaizer_Api {
     }
 
     /**
-     * Which of this account's sources the connected persona answers from, and how much each one holds.
+     * Hand a lane's whole manifest to personaizer.com — every published item with its fingerprint — and learn
+     * what still has to be pushed (missing / stale ids) while the backend removes what this site no longer
+     * has. See Personaizer_Manifest for the walk that builds it.
      *
-     * Read, never assumed: the owner can flip a source in the PERSONAIZER dashboard, and a plugin that
-     * guessed the state from its own options would render a lie the moment they did.
-     *
-     * doc_count is here for the same reason. The obvious local substitute — "how many pages does this site
-     * have" — is a DIFFERENT number, and it diverges exactly when a lane stops syncing: the site loses a
-     * page, the AI keeps its copy, and the screen that says "what your AI uses" would quietly count the
-     * site's. That is the one moment the owner is reading it to decide whether to switch syncing back on.
-     *
-     * @return array<string,array{in_use:bool,doc_count:int,ready_count:int|null}>|WP_Error source key => its state.
+     * @param string                       $lane
+     * @param int                          $generation Strictly increasing per lane (a timestamp).
+     * @param array<int,array{id:string,fingerprint:string}> $items
+     * @return array{generation:int,present:int,missing:string[],stale:string[],orphans:int,orphans_deleted:int,orphans_held:int,busy:bool}|WP_Error
      */
-    public function get_source_states() {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PERSONAIZER secret key is not configured.' );
+    public function send_manifest( $lane, $generation, array $items ) {
+        if ( ! $this->is_configured() ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
-
-        $response = wp_remote_get(
-            $this->base() . '/v1/knowledge/sources',
-            [ 'timeout' => 15, 'headers' => [ 'X-Api-Key' => $key ] ]
-        );
-        if ( is_wp_error( $response ) ) {
-            return $response;
-        }
-        $code = (int) wp_remote_retrieve_response_code( $response );
-        if ( $code < 200 || $code >= 300 ) {
-            return new WP_Error( 'personaizer_http_' . $code, self::friendly_error( $code, wp_remote_retrieve_body( $response ) ) );
-        }
-        // snake_case on the wire — /v1 has no camelCase interceptor.
-        $body  = json_decode( wp_remote_retrieve_body( $response ), true );
-        $out   = array();
-        foreach ( (array) ( $body['sources'] ?? array() ) as $row ) {
-            if ( isset( $row['source'] ) ) {
-                $out[ (string) $row['source'] ] = array(
-                    'in_use'    => ! empty( $row['in_use'] ),
-                    // Null, not 0, when the field isn't in the response: "no documents" and "I don't know"
-                    // are different answers and only one of them is safe to print beside a switch.
-                    'doc_count' => array_key_exists( 'doc_count', $row ) ? (int) $row['doc_count'] : null,
-                    // How many of doc_count have finished processing (embedded) and can actually be answered
-                    // from. Null when an older Core doesn't send it — callers must fall back to doc_count
-                    // rather than assume "0 ready", which would falsely read as "nothing works yet".
-                    'ready_count' => array_key_exists( 'ready_count', $row ) ? (int) $row['ready_count'] : null,
-                );
-            }
-        }
-        return $out;
-    }
-
-    /**
-     * Start/stop the persona answering from a source. NOT a delete — the documents stay exactly where they
-     * are, retrieval just stops including them, and switching back on is instant and costs no re-processing.
-     *
-     * @param string $source Source key.
-     * @param bool   $in_use
-     * @return true|WP_Error
-     */
-    public function set_source_in_use( $source, $in_use ) {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PERSONAIZER secret key is not configured.' );
-        }
-
         $response = wp_remote_request(
-            $this->base() . '/v1/knowledge/sources/' . rawurlencode( $source ) . '/use',
+            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/manifest',
             [
-                'method'  => $in_use ? 'POST' : 'DELETE',
-                'timeout' => 20,
-                'headers' => [ 'X-Api-Key' => $key ],
+                'method'  => 'PUT',
+                'timeout' => 60,
+                'headers' => $this->headers( [ 'Content-Type' => 'application/json' ] ),
+                'body'    => wp_json_encode( [ 'generation' => (int) $generation, 'items' => array_values( $items ) ] ),
             ]
         );
-        return $this->handle_response( $response, $in_use ? 'use source' : 'stop using source' );
+        $result = $this->handle_response( $response, 'manifest', false );
+        if ( $result !== true ) {
+            return $result;
+        }
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( ! is_array( $body ) ) {
+            return new WP_Error( 'personaizer_bad_body', 'PERSONAIZER answered the manifest without a result.' );
+        }
+        return array(
+            'generation'      => (int) ( $body['generation'] ?? $generation ),
+            'present'         => (int) ( $body['present'] ?? 0 ),
+            'missing'         => array_values( array_map( 'strval', (array) ( $body['missing'] ?? array() ) ) ),
+            'stale'           => array_values( array_map( 'strval', (array) ( $body['stale'] ?? array() ) ) ),
+            'orphans'         => (int) ( $body['orphans'] ?? 0 ),
+            'orphans_deleted' => (int) ( $body['orphans_deleted'] ?? 0 ),
+            'orphans_held'    => (int) ( $body['orphans_held'] ?? 0 ),
+            'busy'            => ! empty( $body['busy'] ),
+        );
     }
 
     /**
-     * Remove docs from the persona by external id(s). Silently succeeds for ids
+     * Remove docs of this connector's lanes by external id(s). Silently succeeds for ids
      * that aren't present, so it's safe to call unconditionally on delete.
      *
      * @param string[] $external_ids
      * @return true|WP_Error
      */
     public function delete_docs( array $external_ids ) {
-        $key = $this->secret_key();
-        if ( $key === null ) {
-            return new WP_Error( 'personaizer_no_key', 'PERSONAIZER secret key is not configured.' );
+        if ( ! $this->is_configured() ) {
+            return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
         $external_ids = array_values( array_filter( array_map( 'strval', $external_ids ) ) );
         if ( empty( $external_ids ) ) {
@@ -406,43 +410,56 @@ class Personaizer_Api {
 
         $ids = implode( ',', array_map( 'rawurlencode', $external_ids ) );
         $response = wp_remote_request(
-            $this->base() . '/v1/knowledge/docs?ids=' . $ids,
-            [
-                'method'  => 'DELETE',
-                'timeout' => 30,
-                'headers' => [ 'X-Api-Key' => $key ],
-            ]
+            $this->base() . '/v1/connector/docs?ids=' . $ids,
+            [ 'method' => 'DELETE', 'timeout' => 30, 'headers' => $this->headers() ]
         );
 
-        return $this->handle_response( $response, 'delete' );
+        return $this->handle_response( $response, 'delete', false );
     }
 
-    /** @return true|WP_Error */
-    private function handle_response( $response, $op ) {
+    /**
+     * Tell personaizer.com this site let go. The connector freezes there (every lane off, nothing deleted);
+     * the owner reconnects from here or deletes the connector on personaizer.com.
+     *
+     * @return true|WP_Error
+     */
+    public function disconnect() {
+        if ( ! $this->is_configured() ) return true;
+        $response = wp_remote_post( $this->base() . '/v1/connector/disconnect', [ 'timeout' => 15, 'headers' => $this->headers() ] );
+        return $this->handle_response( $response, 'disconnect', false );
+    }
+
+    /**
+     * @param bool $stamps_sync Whether a success counts as "content synced" for the admin screen's proof-of-life.
+     * @return true|WP_Error
+     */
+    private function handle_response( $response, $op, $stamps_sync = true ) {
         if ( is_wp_error( $response ) ) {
             return $response;
         }
         $code = (int) wp_remote_retrieve_response_code( $response );
         if ( $code >= 200 && $code < 300 ) {
-            // Stamp the last successful CONTENT push — the admin screen turns this into
-            // "synced 2 minutes ago", which is the whole proof-of-life the owner gets. Deletes
-            // don't count: removing a trashed post says nothing about the catalog being current.
-            if ( $op !== 'delete' ) {
+            // Stamp the last successful CONTENT push — the admin screen turns this into "synced 2 minutes
+            // ago", which is the whole proof-of-life the owner gets. Deletes, manifests and inventory don't
+            // count: none of them says the catalog is current.
+            if ( $stamps_sync ) {
                 update_option( 'personaizer_last_sync', time(), false );
             }
             return true;
         }
-        $raw  = (string) wp_remote_retrieve_body( $response );
-        $body = wp_strip_all_tags( $raw );
-        // The machine-readable error code, when the body is our RFC7807 problem. `limits.quota_exceeded`
-        // (HTTP 402) is the one the sync layer must act on: it means "your plan is full", not "this item
-        // is bad", so those items are remembered for an automatic replay after an upgrade rather than
-        // dropped. Carried on the WP_Error's data (see is_quota_error()).
+        $raw      = (string) wp_remote_retrieve_body( $response );
+        $body     = wp_strip_all_tags( $raw );
         $api_code = self::error_code( $raw );
 
+        // The server refused because the CONNECTOR changed — a lane switched off, the site disconnected on
+        // personaizer.com — not because of this item. The cached connector is stale by definition; drop it
+        // so the very next hook reads the truth and stops pushing into a lane the owner closed.
+        if ( self::is_lane_closed_code( $api_code ) ) {
+            $this->forget_connector();
+        }
+
         // Remember WHY, in the owner's words, so the admin screen can explain a stalled sync instead
-        // of just showing a smaller number than expected. The API rejects a batch atomically, so this
-        // one reason usually accounts for every item in it.
+        // of just showing a smaller number than expected.
         update_option( 'personaizer_last_error', [
             'message' => self::friendly_error( $code, $body ),
             'code'    => $api_code,
@@ -480,6 +497,23 @@ class Personaizer_Api {
     }
 
     /**
+     * Was this failure the lane (or the whole connector) being closed on personaizer.com?
+     *
+     * Not an error to retry: the owner switched the lane off, or disconnected the site there. The item is
+     * fine; the door is shut. Retrying would hammer a closed door on every edit, so the sync layer drops the
+     * item from its queues and lets the next connector read decide what syncs.
+     */
+    public static function is_lane_closed( $result ) {
+        if ( ! is_wp_error( $result ) ) return false;
+        $data = $result->get_error_data();
+        return is_array( $data ) && self::is_lane_closed_code( (string) ( $data['code'] ?? '' ) );
+    }
+
+    private static function is_lane_closed_code( $code ) {
+        return in_array( $code, array( 'connector.lane_disabled', 'connector.lane_unknown', 'connector.disconnected' ), true );
+    }
+
+    /**
      * Turn an RFC7807 problem body into one sentence a site owner can act on. Falls back to the
      * status code when the body isn't ours (a proxy error page, say).
      */
@@ -487,7 +521,7 @@ class Personaizer_Api {
         // Auth first: the body's title for a 401 is just "Unauthorized", which tells the owner
         // nothing they can act on. The status code is the more informative signal here.
         if ( $code === 401 || $code === 403 ) {
-            return 'Your secret API key was rejected — try reconnecting.';
+            return 'Your connection key was rejected — reconnect this site.';
         }
         $data = json_decode( $body, true );
         if ( is_array( $data ) ) {

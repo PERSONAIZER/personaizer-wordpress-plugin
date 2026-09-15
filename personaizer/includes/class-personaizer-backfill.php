@@ -52,7 +52,7 @@ class Personaizer_Backfill {
         add_action( self::HOOK, [ __CLASS__, 'run' ] );
         // Last-resort net: if the walk is unfinished and somehow has no tick armed at all (cron cleared
         // by another plugin, a migration, a crash before the watchdog was set), pick it back up.
-        add_action( 'personaizer_reconcile', [ __CLASS__, 'resume_if_stalled' ] );
+        add_action( Personaizer_Daily::HOOK, [ __CLASS__, 'resume_if_stalled' ] );
     }
 
     /**
@@ -75,9 +75,9 @@ class Personaizer_Backfill {
      * Begin (or restart) a catch-up. Safe to call repeatedly — it resets progress and
      * re-arms the cron, which is exactly what "Resync everything now" should do.
      *
-     * @param string[]|null $lanes Lane ids to walk, or null for every lane that is currently syncing.
-     *                             Scoped runs exist because switching ONE lane back to "keep up to date"
-     *                             shouldn't re-walk a 500-product catalog that was never stale.
+     * @param string[]|null $lanes Lane ids to walk, or null for every lane that is currently switched on.
+     *                             Scoped runs exist because switching ONE lane back on shouldn't re-walk a
+     *                             500-product catalog that was never stale.
      */
     public static function start( ?array $lanes = null ) {
         // A run already in flight (the initial connect walk) must never be NARROWED to the lane that just
@@ -151,6 +151,9 @@ class Personaizer_Backfill {
             $state['finished_at'] = time();
             update_option( self::STATE, $state, false );
             wp_clear_scheduled_hook( self::HOOK );   // done — drop the watchdog
+            // A walk only ever ADDS. The manifest that follows is what proves the lanes are 1:1 with the
+            // site — and catches anything a batch failed on.
+            Personaizer_Manifest::start();
         }
     }
 
@@ -255,32 +258,29 @@ class Personaizer_Backfill {
     }
 
     /**
-     * The post types to walk: the ones actually syncing, narrowed to the run's scope.
+     * The post types to walk: the lanes switched on (per the connector), narrowed to the run's scope.
      *
-     * The scope is lane ids and the option is post types, so it maps through personaizer_lanes() rather
-     * than assuming lane id === post type — that holds for custom types but not for pages or posts.
+     * The scope is lane ids, so it maps through personaizer_lanes() rather than assuming lane id === post
+     * type — that holds for custom types but not for pages or posts.
      *
      * @param string[]|null $scope Lane ids, or null for no narrowing.
      */
     private static function enabled_post_types( ?array $scope = null ) {
-        $types = get_option( 'personaizer_sync_post_types', [] );
-        $types = is_array( $types ) ? array_values( array_filter( array_map( 'sanitize_key', $types ) ) ) : [];
-        if ( $scope === null ) return $types;
-
-        $allowed = [];
-        foreach ( personaizer_lanes() as $lane => $meta ) {
-            if ( in_array( $lane, $scope, true ) && ! empty( $meta['post_type'] ) ) {
-                $allowed[] = $meta['post_type'];
-            }
+        $lanes = personaizer_lanes();
+        $types = [];
+        // Intersect with what is switched on rather than trust the scope: a lane can be in scope but off by
+        // the time the tick runs (switched off on personaizer.com in between), and the push would be refused.
+        foreach ( personaizer_current_lanes() as $lane ) {
+            if ( $lane === 'products' || ! isset( $lanes[ $lane ] ) ) continue;
+            if ( $scope !== null && ! in_array( $lane, $scope, true ) ) continue;
+            $types[] = $lanes[ $lane ]['post_type'];
         }
-        // Intersect rather than trust the scope: a lane can be in scope but no longer syncing (switched off
-        // between the save and the cron tick), and walking it would re-attach the source it just left.
-        return array_values( array_intersect( $types, $allowed ) );
+        return $types;
     }
 
     /** Whether this run should walk the WooCommerce catalog. @param string[]|null $scope Lane ids. */
     private static function products_in_scope( ?array $scope = null ) {
-        if ( get_option( 'personaizer_sync_products', '' ) !== '1' || ! class_exists( 'WooCommerce' ) ) return false;
+        if ( ! class_exists( 'WooCommerce' ) || ! in_array( 'products', personaizer_current_lanes(), true ) ) return false;
         return $scope === null || in_array( 'products', $scope, true );
     }
 
