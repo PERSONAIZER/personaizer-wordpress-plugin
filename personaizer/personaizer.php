@@ -3,7 +3,7 @@
  * Plugin Name: PERSONAIZER
  * Plugin URI:  https://personaizer.com/wordpress
  * Description: Connect your site to PERSONAIZER in one click — the AI chat widget goes live and your pages, posts and products stay in sync with it.
- * Version:     2.1.0
+ * Version:     2.1.1
  * Requires at least: 5.6
  * Requires PHP: 7.4
  * Author:      PERSONAIZER
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * the header would be wasted work. build-zip.sh refuses to package when the constant, the header and
  * readme.txt's Stable tag disagree, so the copy cannot drift in silence.
  */
-define( 'PERSONAIZER_VERSION', '2.1.0' );
+define( 'PERSONAIZER_VERSION', '2.1.1' );
 define( 'PERSONAIZER_PLUGIN_FILE', __FILE__ );
 
 /**
@@ -1796,7 +1796,7 @@ function personaizer_extra_post_types() {
 }
 
 // ── Logged-in customer identity (Part B) ──────────────────────────────────────
-// Signs a short-lived HS256 JWT for the CURRENT logged-in user with the persona's Identity Secret,
+// Signs a short-lived HS256 JWT for the CURRENT logged-in user with the account's Identity Secret,
 // so the widget can prove who they are without the secret ever reaching the browser. Minted PER
 // REQUEST (never baked into cacheable HTML — that would serve one user's token to another). The
 // server verifies it and trusts `sub`; a bad/absent token simply falls back to an anonymous visitor.

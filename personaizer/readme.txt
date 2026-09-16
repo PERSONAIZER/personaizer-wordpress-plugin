@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -72,7 +72,7 @@ Once loaded, the widget communicates with the PERSONAIZER API to power the conve
 The chat widget sends data only when a visitor opens and uses it.
 
 **3. Connecting your site (`https://personaizer.com` and `https://api.personaizer.com`)**
-When you click Connect, you are sent to the PERSONAIZER consent screen to approve the connection, choose the brand and persona, and tick what may sync. Your site's address, name and a count of its pages, posts and products are included so the screen can show what will be learned. On approval the plugin exchanges a single-use code for the credentials it stores (a connector key for syncing; the Persona ID and Identity Secret when you chose a widget persona).
+When you click Connect, you are sent to the PERSONAIZER consent screen to approve the connection, choose the brand and persona, and tick what may sync. Your site's address, name and a count of its pages, posts and products are included so the screen can show what will be learned. On approval the plugin exchanges a single-use code for the credentials it stores (an integration key for syncing; the Persona ID and your account's Identity Secret when you chose a widget persona).
 
 **4. Content and product sync (optional; `https://api.personaizer.com`)**
 If you switch a lane on, the plugin sends the title, URL, text and image URLs of the published items in that lane so your AI can answer from them, and updates or removes them when you edit or delete that content. For WooCommerce products this also includes price, sale price, stock availability, SKU, attributes and categories, including per-variant values. Once a day it also sends the list of published items in each lane (ids and a checksum of each) so PERSONAIZER can tell what is missing, changed or gone. It reports which content types your site has, with counts, so you can switch lanes on from personaizer.com, and reads your plan's knowledge allowance so it can tell you when your content exceeds it. This runs only for the lanes you explicitly switch on.
@@ -128,12 +128,20 @@ The plugin syncs as much as your plan's knowledge allowance permits, then tells 
 Yes. The initial catalog sync, the daily check, the retry of items that did not fit your plan, and queued removals all run on WordPress's scheduled tasks. The plugin's **System info** panel shows whether WP-Cron is working on your site. If your host disables WP-Cron (`DISABLE_WP_CRON`), configure a real server cron to request `wp-cron.php` on a schedule, as you would for any other scheduled WordPress task.
 
 = What does the plugin store, and what is sent to PERSONAIZER? =
-In WordPress it stores only options: your Persona ID, your secret API key, your Identity Secret, which lanes you sync, and the sync's own bookkeeping (progress, queued removals, and items waiting for plan space). Chat conversations live in your PERSONAIZER account, not in WordPress. What is sent is listed in detail under **External Services** above.
+In WordPress it stores only options: your Persona ID, your integration key, your Identity Secret, which streams you sync, and the sync's own bookkeeping (progress, queued removals, and items waiting for plan space). Chat conversations live in your PERSONAIZER account, not in WordPress. What is sent is listed in detail under **External Services** above.
 
 = How do I remove everything? =
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 2.1.1 =
+* Wording follows the account model: the Identity Secret that signs customer-recognition tokens is your account's, shared by every persona you embed, so rotating it on personaizer.com rotates it for this site too.
+
+= 2.1.0 =
+* Follows the names personaizer.com now uses: your site is an **integration**, what it syncs are **streams**, and its credential is an integration key (`ik_`). Existing installs reconnect once from the plugin's settings.
+* All sync calls moved to `/v1/integration/…`; the daily check and manifest are unchanged in behaviour.
+* WooCommerce attribute taxonomies (`pa_*`) are left untouched by the rename.
 
 = 2.0.0 =
 * Your site is now a **connector** on personaizer.com: it belongs to a brand, syncs with its own key, and the lanes it syncs are switched on and off there — next to everything else the AI knows. What the plugin syncs is read-only on personaizer.com, so your site is the source of truth.
