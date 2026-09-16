@@ -1,22 +1,22 @@
 <?php
 /**
- * The lane manifest — how a lane stays 1:1 with the site even when hooks are missed.
+ * The stream manifest — how a stream stays 1:1 with the site even when hooks are missed.
  *
  * The sync is event-driven: save a product, push that product. That is the right shape for keeping the
  * AI current, and it is also the shape that quietly drifts. Events go missing — WP-Cron never fires, the
  * API times out, the plugin was deactivated while a product was trashed. Nothing in a push-only design can
  * notice any of that, because "synced" only ever meant "we attempted a send".
  *
- * So, once a day (and after a backfill, and on demand), this walks each lane the owner switched on, builds
+ * So, once a day (and after a backfill, and on demand), this walks each stream the owner switched on, builds
  * the payload every published item WOULD be pushed as, fingerprints it, and hands the whole list to
- * personaizer.com as the lane's manifest. The backend answers with the ids it is missing or holds a
+ * personaizer.com as the stream's manifest. The backend answers with the ids it is missing or holds a
  * different fingerprint for — those are pushed again through the ordinary retry queue — and removes what
  * this site no longer lists. It applies rails of its own before deleting anything: a manifest that would
- * orphan more than a quarter of a lane is held until the next manifest agrees with it, because "the site
+ * orphan more than a quarter of a stream is held until the next manifest agrees with it, because "the site
  * has fewer items" is more often a broken enumeration than a real mass deletion.
  *
  * Two rules on this side keep that honest:
- *   - A lane's manifest is sent only when this site can enumerate that lane FULLY right now. A post type
+ *   - A stream's manifest is sent only when this site can enumerate that stream FULLY right now. A post type
  *     that is not registered at the moment (WooCommerce deactivated) is skipped entirely — an empty
  *     manifest would be a lie, not a fact.
  *   - The walk runs in batches on WP-Cron under a time budget, like the backfill. Fingerprinting means
@@ -38,7 +38,7 @@ class Personaizer_Manifest {
     const BUDGET_SECONDS = 20;
     const STALL_GRACE_SECONDS = 300;
 
-    /** The backend's cap on one manifest. A lane past it is reported, not sent. */
+    /** The backend's cap on one manifest. A stream past it is reported, not sent. */
     const MAX_ITEMS = 100000;
 
     public static function boot() {
@@ -52,8 +52,8 @@ class Personaizer_Manifest {
     }
 
     /**
-     * Begin a manifest walk over every lane that is switched on. Safe to call repeatedly — a walk already
-     * in flight is left alone (it will cover the same lanes).
+     * Begin a manifest walk over every stream that is switched on. Safe to call repeatedly — a walk already
+     * in flight is left alone (it will cover the same streams).
      */
     public static function start() {
         if ( ! personaizer_api()->is_configured() ) return;
@@ -63,15 +63,15 @@ class Personaizer_Manifest {
             return;
         }
 
-        $lanes = self::walkable_lanes();
-        if ( empty( $lanes ) ) return;
+        $streams = self::walkable_streams();
+        if ( empty( $streams ) ) return;
 
         update_option( self::STATE, array(
-            'lanes'       => $lanes,           // lane ids still to walk, in order
-            'lane'        => null,             // the lane being walked
+            'streams'       => $streams,           // stream ids still to walk, in order
+            'stream'        => null,             // the stream being walked
             'offset'      => 0,
             'total'       => 0,
-            'items'       => array(),          // [ external_id => fingerprint ] of the lane being walked
+            'items'       => array(),          // [ external_id => fingerprint ] of the stream being walked
             'started_at'  => time(),
             'finished_at' => 0,
         ), false );
@@ -79,23 +79,23 @@ class Personaizer_Manifest {
     }
 
     /**
-     * The lanes to walk: switched on per the connector, AND enumerable on this site right now. A lane whose
+     * The streams to walk: switched on per the integration, AND enumerable on this site right now. A stream whose
      * post type is not registered (WooCommerce deactivated, a plugin removed) is left out rather than
      * reported empty.
      *
      * @return string[]
      */
-    private static function walkable_lanes() {
-        $lanes = personaizer_lanes();
+    private static function walkable_streams() {
+        $streams = personaizer_streams();
         $out   = array();
-        foreach ( personaizer_current_lanes() as $lane ) {
-            if ( ! isset( $lanes[ $lane ] ) ) continue;
-            if ( $lane === 'products' ) {
+        foreach ( personaizer_current_streams() as $stream ) {
+            if ( ! isset( $streams[ $stream ] ) ) continue;
+            if ( $stream === 'products' ) {
                 if ( ! function_exists( 'wc_get_products' ) ) continue;
-            } elseif ( ! post_type_exists( $lanes[ $lane ]['post_type'] ) ) {
+            } elseif ( ! post_type_exists( $streams[ $stream ]['post_type'] ) ) {
                 continue;
             }
-            $out[] = $lane;
+            $out[] = $stream;
         }
         return $out;
     }
@@ -125,27 +125,27 @@ class Personaizer_Manifest {
         }
     }
 
-    /** One slice: fingerprint a batch of the current lane, or send its manifest, or move to the next lane. @return bool more to do */
+    /** One slice: fingerprint a batch of the current stream, or send its manifest, or move to the next stream. @return bool more to do */
     private static function step( array &$state ) {
-        if ( $state['lane'] === null ) {
-            if ( empty( $state['lanes'] ) ) return false;
-            $lane = array_shift( $state['lanes'] );
-            $state['lane']   = $lane;
+        if ( $state['stream'] === null ) {
+            if ( empty( $state['streams'] ) ) return false;
+            $stream = array_shift( $state['streams'] );
+            $state['stream']   = $stream;
             $state['offset'] = 0;
-            $state['total']  = self::count( $lane );
+            $state['total']  = self::count( $stream );
             $state['items']  = array();
             if ( $state['total'] > self::MAX_ITEMS ) {
-                self::record( $lane, array( 'error' => sprintf( 'This lane has %d items — more than one manifest can carry.', $state['total'] ) ) );
-                $state['lane'] = null;
+                self::record( $stream, array( 'error' => sprintf( 'This stream has %d items — more than one manifest can carry.', $state['total'] ) ) );
+                $state['stream'] = null;
             }
             return true;
         }
 
-        $lane = $state['lane'];
+        $stream = $state['stream'];
         if ( $state['offset'] < $state['total'] ) {
-            $slice = self::fingerprint_slice( $lane, (int) $state['offset'] );
+            $slice = self::fingerprint_slice( $stream, (int) $state['offset'] );
             if ( $slice === null ) {
-                // An empty page below the total: the lane shrank since we counted, or the query failed. Either
+                // An empty page below the total: the stream shrank since we counted, or the query failed. Either
                 // way there is nothing more to read — send what we have; the backend's rails cover a short list.
                 $state['offset'] = $state['total'];
             } else {
@@ -155,20 +155,20 @@ class Personaizer_Manifest {
             return true;
         }
 
-        self::send( $lane, $state['items'] );
-        $state['lane']  = null;
+        self::send( $stream, $state['items'] );
+        $state['stream']  = null;
         $state['items'] = array();
         return true;
     }
 
     /**
-     * Fingerprint one page of a lane's published items.
+     * Fingerprint one page of a stream's published items.
      *
      * @return array<string,string>|null [ external_id => fingerprint ], or null when the page is empty.
      */
-    private static function fingerprint_slice( $lane, $offset ) {
+    private static function fingerprint_slice( $stream, $offset ) {
         $out = array();
-        if ( $lane === 'products' ) {
+        if ( $stream === 'products' ) {
             $sync = personaizer_woocommerce_sync();
             if ( ! $sync ) return null;
             $ids = wc_get_products( array(
@@ -185,7 +185,7 @@ class Personaizer_Manifest {
             return $out;
         }
 
-        $type = personaizer_lanes()[ $lane ]['post_type'];
+        $type = personaizer_streams()[ $stream ]['post_type'];
         $ids  = get_posts( array(
             'post_type' => $type, 'post_status' => 'publish', 'fields' => 'ids',
             'posts_per_page' => self::POST_BATCH, 'offset' => $offset,
@@ -203,23 +203,23 @@ class Personaizer_Manifest {
         return $out;
     }
 
-    private static function count( $lane ) {
-        if ( $lane === 'products' ) return personaizer_published_count( 'product' );
-        return personaizer_published_count( personaizer_lanes()[ $lane ]['post_type'] );
+    private static function count( $stream ) {
+        if ( $stream === 'products' ) return personaizer_published_count( 'product' );
+        return personaizer_published_count( personaizer_streams()[ $stream ]['post_type'] );
     }
 
     /**
-     * Send a lane's manifest and act on the answer: everything the backend is missing or holds stale goes
+     * Send a stream's manifest and act on the answer: everything the backend is missing or holds stale goes
      * into the retry queue, which the catch-up tick pushes through the ordinary sync paths.
      */
-    private static function send( $lane, array $items ) {
+    private static function send( $stream, array $items ) {
         $manifest = array();
         foreach ( $items as $id => $fp ) $manifest[] = array( 'id' => (string) $id, 'fingerprint' => (string) $fp );
 
-        $result = personaizer_api()->send_manifest( $lane, time(), $manifest );
+        $result = personaizer_api()->send_manifest( $stream, time(), $manifest );
         if ( is_wp_error( $result ) ) {
-            personaizer_debug_log( 'manifest for ' . $lane . ' failed: ' . $result->get_error_message() );
-            self::record( $lane, array( 'error' => $result->get_error_message() ) );
+            personaizer_debug_log( 'manifest for ' . $stream . ' failed: ' . $result->get_error_message() );
+            self::record( $stream, array( 'error' => $result->get_error_message() ) );
             return;
         }
 
@@ -227,13 +227,13 @@ class Personaizer_Manifest {
         foreach ( array_merge( $result['missing'], $result['stale'] ) as $external_id ) {
             $post_id = self::post_id_for( $external_id );
             if ( $post_id > 0 ) {
-                personaizer_remember_retry( $lane, $external_id, $post_id );
+                personaizer_remember_retry( $stream, $external_id, $post_id );
                 $queued++;
             }
         }
         if ( $queued > 0 ) personaizer_arm_catch_up();
 
-        self::record( $lane, array(
+        self::record( $stream, array(
             'generation'      => $result['generation'],
             'present'         => $result['present'],
             'missing'         => count( $result['missing'] ),
@@ -253,28 +253,28 @@ class Personaizer_Manifest {
         return 0;
     }
 
-    /** Remember a lane's last outcome for the settings page. */
-    private static function record( $lane, array $outcome ) {
+    /** Remember a stream's last outcome for the settings page. */
+    private static function record( $stream, array $outcome ) {
         $all = get_option( self::RESULT, array() );
         if ( ! is_array( $all ) ) $all = array();
         $outcome['at'] = time();
-        $all[ $lane ]  = $outcome;
+        $all[ $stream ]  = $outcome;
         update_option( self::RESULT, $all, false );
     }
 
-    /** The last outcome per lane, for the settings page. @return array<string,array> */
+    /** The last outcome per stream, for the settings page. @return array<string,array> */
     public static function results() {
         $all = get_option( self::RESULT, array() );
         return is_array( $all ) ? $all : array();
     }
 
-    /** @return array{running:bool,lane:?string,done:int,total:int} */
+    /** @return array{running:bool,stream:?string,done:int,total:int} */
     public static function progress() {
         $state = get_option( self::STATE, array() );
         if ( ! is_array( $state ) || empty( $state['started_at'] ) || ! empty( $state['finished_at'] ) ) {
-            return array( 'running' => false, 'lane' => null, 'done' => 0, 'total' => 0 );
+            return array( 'running' => false, 'stream' => null, 'done' => 0, 'total' => 0 );
         }
-        return array( 'running' => true, 'lane' => $state['lane'], 'done' => (int) $state['offset'], 'total' => (int) $state['total'] );
+        return array( 'running' => true, 'stream' => $state['stream'], 'done' => (int) $state['offset'], 'total' => (int) $state['total'] );
     }
 
     private static function rearm( $delay ) {

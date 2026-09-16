@@ -1,14 +1,14 @@
 <?php
 /**
- * Thin HTTP client for the PERSONAIZER connector API.
+ * Thin HTTP client for the PERSONAIZER integration API.
  *
- * Authenticates with the CONNECTOR key (ck_…) that Connect handed this site — the credential of this site's
- * connector on personaizer.com, which owns the knowledge lanes it syncs. Server-side only; it must never be
+ * Authenticates with the INTEGRATION key (ik_…) that Connect handed this site — the credential of this site's
+ * integration on personaizer.com, which owns the knowledge streams it syncs. Server-side only; it must never be
  * printed into a page (the widget uses the public Persona ID instead).
  *
- * Every write goes to a LANE: /v1/connector/lanes/{lane}/… — the backend files it into that lane's source.
- * The plugin never names a source; which lanes are on is the owner's choice on personaizer.com, read back
- * from GET /v1/connector.
+ * Every write goes to a STREAM: /v1/integration/streams/{stream}/… — the backend files it into that stream's source.
+ * The plugin never names a source; which streams are on is the owner's choice on personaizer.com, read back
+ * from GET /v1/integration.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,17 +24,17 @@ if ( ! defined( 'PERSONAIZER_API_URL' ) ) {
 
 class Personaizer_Api {
 
-    /** How long a connector read is trusted before the next call re-reads it. */
+    /** How long a integration read is trusted before the next call re-reads it. */
     const CONNECTOR_TTL = MINUTE_IN_SECONDS;
 
-    /** @return string|null the connector key, or null when not connected. */
-    private function connector_key() {
-        $key = trim( (string) get_option( 'personaizer_connector_key', '' ) );
+    /** @return string|null the integration key, or null when not connected. */
+    private function integration_key() {
+        $key = trim( (string) get_option( 'personaizer_integration_key', '' ) );
         return $key !== '' ? $key : null;
     }
 
     public function is_configured() {
-        return $this->connector_key() !== null;
+        return $this->integration_key() !== null;
     }
 
     private function base() {
@@ -42,12 +42,12 @@ class Personaizer_Api {
     }
 
     /**
-     * Headers every connector call carries. The plugin version lets the backend see which release a site
+     * Headers every integration call carries. The plugin version lets the backend see which release a site
      * runs — the one fact support needs first when a sync misbehaves.
      */
     private function headers( array $extra = array() ) {
         return array_merge( array(
-            'X-Api-Key'                   => $this->connector_key(),
+            'X-Api-Key'                   => $this->integration_key(),
             'X-Personaizer-Plugin-Version' => PERSONAIZER_VERSION,
         ), $extra );
     }
@@ -115,30 +115,30 @@ class Personaizer_Api {
     }
 
     /**
-     * This site's connector as personaizer.com sees it: status, the brand it feeds, and its lanes — each with
+     * This site's integration as personaizer.com sees it: status, the brand it feeds, and its streams — each with
      * `enabled` (the owner's switch), the docs it holds / has ready, and the last manifest's outcome.
      *
-     * This is the ONLY source of truth for which lanes sync. The owner switches lanes on personaizer.com;
-     * a local copy would be a second truth free to drift, and the plugin would confidently push into a lane
+     * This is the ONLY source of truth for which streams sync. The owner switches streams on personaizer.com;
+     * a local copy would be a second truth free to drift, and the plugin would confidently push into a stream
      * the owner switched off an hour ago. Cached for a minute (it is read on every sync hook), refreshed
-     * outright by forget_connector() after anything that changes it.
+     * outright by forget_integration() after anything that changes it.
      *
      * @param bool $force Skip the cache and read live.
-     * @return array{id:string,status:string,brand:array{id:string,slug:string,display_name:string},lanes:array<string,array{enabled:bool,source:string,doc_count:int,ready_count:int,reconciliation:?array}>}|WP_Error
+     * @return array{id:string,status:string,brand:array{id:string,slug:string,display_name:string},streams:array<string,array{enabled:bool,source:string,doc_count:int,ready_count:int,reconciliation:?array}>}|WP_Error
      */
-    public function get_connector( $force = false ) {
-        $key = $this->connector_key();
+    public function get_integration( $force = false ) {
+        $key = $this->integration_key();
         if ( $key === null ) {
             return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
 
-        $cache = 'personaizer_connector_' . md5( $key . '|' . $this->base() );
+        $cache = 'personaizer_integration_' . md5( $key . '|' . $this->base() );
         if ( ! $force ) {
             $hit = get_transient( $cache );
             if ( is_array( $hit ) ) return $hit;
         }
 
-        $response = wp_remote_get( $this->base() . '/v1/connector', [ 'timeout' => 15, 'headers' => $this->headers() ] );
+        $response = wp_remote_get( $this->base() . '/v1/integration', [ 'timeout' => 15, 'headers' => $this->headers() ] );
         if ( is_wp_error( $response ) ) return $response;
         $code = (int) wp_remote_retrieve_response_code( $response );
         if ( $code < 200 || $code >= 300 ) {
@@ -146,16 +146,16 @@ class Personaizer_Api {
         }
 
         $body      = json_decode( wp_remote_retrieve_body( $response ), true );
-        $connector = ( is_array( $body ) && isset( $body['connector'] ) && is_array( $body['connector'] ) ) ? $body['connector'] : null;
-        if ( $connector === null ) {
-            return new WP_Error( 'personaizer_bad_body', 'PERSONAIZER answered without a connector.' );
+        $integration = ( is_array( $body ) && isset( $body['integration'] ) && is_array( $body['integration'] ) ) ? $body['integration'] : null;
+        if ( $integration === null ) {
+            return new WP_Error( 'personaizer_bad_body', 'PERSONAIZER answered without a integration.' );
         }
         $brand = ( isset( $body['brand'] ) && is_array( $body['brand'] ) ) ? $body['brand'] : array();
 
-        $lanes = array();
-        foreach ( (array) ( $connector['lanes'] ?? array() ) as $row ) {
-            if ( empty( $row['lane'] ) ) continue;
-            $lanes[ (string) $row['lane'] ] = array(
+        $streams = array();
+        foreach ( (array) ( $integration['streams'] ?? array() ) as $row ) {
+            if ( empty( $row['stream'] ) ) continue;
+            $streams[ (string) $row['stream'] ] = array(
                 'enabled'        => ! empty( $row['enabled'] ),
                 'source'         => (string) ( $row['source'] ?? '' ),
                 'doc_count'      => (int) ( $row['doc_count'] ?? 0 ),
@@ -165,42 +165,42 @@ class Personaizer_Api {
         }
 
         $state = array(
-            'id'     => (string) ( $connector['id'] ?? '' ),
-            'status' => (string) ( $connector['status'] ?? '' ),
+            'id'     => (string) ( $integration['id'] ?? '' ),
+            'status' => (string) ( $integration['status'] ?? '' ),
             'brand'  => array(
                 'id'           => (string) ( $brand['id'] ?? '' ),
                 'slug'         => (string) ( $brand['slug'] ?? '' ),
                 'display_name' => (string) ( $brand['display_name'] ?? '' ),
             ),
-            'lanes'  => $lanes,
+            'streams'  => $streams,
         );
         set_transient( $cache, $state, self::CONNECTOR_TTL );
         return $state;
     }
 
-    /** Drop the cached connector — after connect, disconnect, or a write the server refused because a lane changed. */
-    public function forget_connector() {
-        $key = $this->connector_key();
-        if ( $key !== null ) delete_transient( 'personaizer_connector_' . md5( $key . '|' . $this->base() ) );
+    /** Drop the cached integration — after connect, disconnect, or a write the server refused because a stream changed. */
+    public function forget_integration() {
+        $key = $this->integration_key();
+        if ( $key !== null ) delete_transient( 'personaizer_integration_' . md5( $key . '|' . $this->base() ) );
     }
 
     /**
-     * Tell personaizer.com what this site could sync — every lane with a label and a count — so the owner
-     * can switch lanes on from a list that reflects the site as it is now (a custom post type registered
+     * Tell personaizer.com what this site could sync — every stream with a label and a count — so the owner
+     * can switch streams on from a list that reflects the site as it is now (a custom post type registered
      * last week shows up; one whose plugin was removed does not).
      *
-     * @param array<int,array{lane:string,label:string,count:int}> $lanes
+     * @param array<int,array{stream:string,label:string,count:int}> $streams
      * @return true|WP_Error
      */
-    public function report_inventory( array $lanes ) {
+    public function report_inventory( array $streams ) {
         if ( ! $this->is_configured() ) {
             return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
-        $response = wp_remote_request( $this->base() . '/v1/connector/inventory', [
+        $response = wp_remote_request( $this->base() . '/v1/integration/inventory', [
             'method'  => 'PUT',
             'timeout' => 15,
             'headers' => $this->headers( [ 'Content-Type' => 'application/json' ] ),
-            'body'    => wp_json_encode( [ 'lanes' => array_values( $lanes ) ] ),
+            'body'    => wp_json_encode( [ 'streams' => array_values( $streams ) ] ),
         ] );
         return $this->handle_response( $response, 'inventory', false );
     }
@@ -210,7 +210,7 @@ class Personaizer_Api {
      * name — enough to tell the owner "you've hit your Free plan's limit, upgrade" and to gate the
      * after-upgrade catch-up on real headroom before it replays anything.
      *
-     * Read with the connector key against /api/subscription/limits — a public-surface endpoint that accepts
+     * Read with the integration key against /api/subscription/limits — a public-surface endpoint that accepts
      * any of the account's keys and resolves the owning account from it. Cached briefly: it's consulted on
      * every settings-page render and by the daily catch-up, and a plan's ceiling doesn't move minute to minute.
      *
@@ -220,7 +220,7 @@ class Personaizer_Api {
      *         null when unconfigured or unreachable — a caller must read that as "don't know", never "0".
      */
     public function get_limits( $force = false ) {
-        $key = $this->connector_key();
+        $key = $this->integration_key();
         if ( $key === null ) return null;
 
         $cache = 'personaizer_limits_' . md5( $key . '|' . $this->base() );
@@ -256,15 +256,15 @@ class Personaizer_Api {
     }
 
     /**
-     * Upsert a plain-text / markdown knowledge doc into a lane, by external id.
+     * Upsert a plain-text / markdown knowledge doc into a stream, by external id.
      * Idempotent server-side: same id updates in place, identical content is a no-op.
      *
-     * @param string $lane        Lane id (pages / posts / a custom post type).
-     * @param string $fingerprint This site's hash of the payload — the lane manifest compares it later.
+     * @param string $stream        Stream id (pages / posts / a custom post type).
+     * @param string $fingerprint This site's hash of the payload — the stream manifest compares it later.
      * @param array  $images      Image library entries [{url, description, is_primary}]; [] = no images.
      * @return true|WP_Error
      */
-    public function upsert_text( $lane, $external_id, $title, $markdown, $fingerprint, $permalink = '', $images = array() ) {
+    public function upsert_text( $stream, $external_id, $title, $markdown, $fingerprint, $permalink = '', $images = array() ) {
         if ( ! $this->is_configured() ) {
             return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
@@ -295,7 +295,7 @@ class Personaizer_Api {
         $body .= '--' . $boundary . '--' . $eol;
 
         $response = wp_remote_post(
-            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/docs/upload',
+            $this->base() . '/v1/integration/streams/' . rawurlencode( $stream ) . '/documents/upload',
             [
                 'timeout' => 30,
                 'headers' => $this->headers( [ 'Content-Type' => 'multipart/form-data; boundary=' . $boundary ] ),
@@ -307,16 +307,16 @@ class Personaizer_Api {
     }
 
     /**
-     * Bulk upsert TYPED product items (1–100) into a lane. Idempotent by each item's `id`; identical
+     * Bulk upsert TYPED product items (1–100) into a stream. Idempotent by each item's `id`; identical
      * content replays as a no-op. Each item carries its `fingerprint` (see personaizer_payload_hash()).
      *
-     * @param string  $lane  Lane id — 'products'.
+     * @param string  $stream  Stream id — 'products'.
      * @param array[] $items Typed items ({id, fingerprint, title, categories, price, …} — never a `source`).
      * @return array{deferred:string[]}|WP_Error On success an array whose `deferred` holds the external
      *         ids the plan had no room for (empty = everything landed). WP_Error on failure — a 402 means
      *         nothing fit at all.
      */
-    public function upsert_products( $lane, array $items ) {
+    public function upsert_products( $stream, array $items ) {
         if ( ! $this->is_configured() ) {
             return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
@@ -326,7 +326,7 @@ class Personaizer_Api {
         }
 
         $response = wp_remote_request(
-            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/docs',
+            $this->base() . '/v1/integration/streams/' . rawurlencode( $stream ) . '/documents',
             [
                 'method'  => 'PUT',
                 'timeout' => 30,
@@ -350,21 +350,21 @@ class Personaizer_Api {
     }
 
     /**
-     * Hand a lane's whole manifest to personaizer.com — every published item with its fingerprint — and learn
+     * Hand a stream's whole manifest to personaizer.com — every published item with its fingerprint — and learn
      * what still has to be pushed (missing / stale ids) while the backend removes what this site no longer
      * has. See Personaizer_Manifest for the walk that builds it.
      *
-     * @param string                       $lane
-     * @param int                          $generation Strictly increasing per lane (a timestamp).
+     * @param string                       $stream
+     * @param int                          $generation Strictly increasing per stream (a timestamp).
      * @param array<int,array{id:string,fingerprint:string}> $items
      * @return array{generation:int,present:int,missing:string[],stale:string[],orphans:int,orphans_deleted:int,orphans_held:int,busy:bool}|WP_Error
      */
-    public function send_manifest( $lane, $generation, array $items ) {
+    public function send_manifest( $stream, $generation, array $items ) {
         if ( ! $this->is_configured() ) {
             return new WP_Error( 'personaizer_no_key', 'This site is not connected to PERSONAIZER.' );
         }
         $response = wp_remote_request(
-            $this->base() . '/v1/connector/lanes/' . rawurlencode( $lane ) . '/manifest',
+            $this->base() . '/v1/integration/streams/' . rawurlencode( $stream ) . '/manifest',
             [
                 'method'  => 'PUT',
                 'timeout' => 60,
@@ -393,7 +393,7 @@ class Personaizer_Api {
     }
 
     /**
-     * Remove docs of this connector's lanes by external id(s). Silently succeeds for ids
+     * Remove docs of this integration's streams by external id(s). Silently succeeds for ids
      * that aren't present, so it's safe to call unconditionally on delete.
      *
      * @param string[] $external_ids
@@ -410,7 +410,7 @@ class Personaizer_Api {
 
         $ids = implode( ',', array_map( 'rawurlencode', $external_ids ) );
         $response = wp_remote_request(
-            $this->base() . '/v1/connector/docs?ids=' . $ids,
+            $this->base() . '/v1/integration/documents?ids=' . $ids,
             [ 'method' => 'DELETE', 'timeout' => 30, 'headers' => $this->headers() ]
         );
 
@@ -418,14 +418,14 @@ class Personaizer_Api {
     }
 
     /**
-     * Tell personaizer.com this site let go. The connector freezes there (every lane off, nothing deleted);
-     * the owner reconnects from here or deletes the connector on personaizer.com.
+     * Tell personaizer.com this site let go. The integration freezes there (every stream off, nothing deleted);
+     * the owner reconnects from here or deletes the integration on personaizer.com.
      *
      * @return true|WP_Error
      */
     public function disconnect() {
         if ( ! $this->is_configured() ) return true;
-        $response = wp_remote_post( $this->base() . '/v1/connector/disconnect', [ 'timeout' => 15, 'headers' => $this->headers() ] );
+        $response = wp_remote_post( $this->base() . '/v1/integration/disconnect', [ 'timeout' => 15, 'headers' => $this->headers() ] );
         return $this->handle_response( $response, 'disconnect', false );
     }
 
@@ -451,11 +451,11 @@ class Personaizer_Api {
         $body     = wp_strip_all_tags( $raw );
         $api_code = self::error_code( $raw );
 
-        // The server refused because the CONNECTOR changed — a lane switched off, the site disconnected on
-        // personaizer.com — not because of this item. The cached connector is stale by definition; drop it
-        // so the very next hook reads the truth and stops pushing into a lane the owner closed.
-        if ( self::is_lane_closed_code( $api_code ) ) {
-            $this->forget_connector();
+        // The server refused because the CONNECTOR changed — a stream switched off, the site disconnected on
+        // personaizer.com — not because of this item. The cached integration is stale by definition; drop it
+        // so the very next hook reads the truth and stops pushing into a stream the owner closed.
+        if ( self::is_stream_closed_code( $api_code ) ) {
+            $this->forget_integration();
         }
 
         // Remember WHY, in the owner's words, so the admin screen can explain a stalled sync instead
@@ -497,20 +497,20 @@ class Personaizer_Api {
     }
 
     /**
-     * Was this failure the lane (or the whole connector) being closed on personaizer.com?
+     * Was this failure the stream (or the whole integration) being closed on personaizer.com?
      *
-     * Not an error to retry: the owner switched the lane off, or disconnected the site there. The item is
+     * Not an error to retry: the owner switched the stream off, or disconnected the site there. The item is
      * fine; the door is shut. Retrying would hammer a closed door on every edit, so the sync layer drops the
-     * item from its queues and lets the next connector read decide what syncs.
+     * item from its queues and lets the next integration read decide what syncs.
      */
-    public static function is_lane_closed( $result ) {
+    public static function is_stream_closed( $result ) {
         if ( ! is_wp_error( $result ) ) return false;
         $data = $result->get_error_data();
-        return is_array( $data ) && self::is_lane_closed_code( (string) ( $data['code'] ?? '' ) );
+        return is_array( $data ) && self::is_stream_closed_code( (string) ( $data['code'] ?? '' ) );
     }
 
-    private static function is_lane_closed_code( $code ) {
-        return in_array( $code, array( 'connector.lane_disabled', 'connector.lane_unknown', 'connector.disconnected' ), true );
+    private static function is_stream_closed_code( $code ) {
+        return in_array( $code, array( 'integration.stream_disabled', 'integration.stream_unknown', 'integration.disconnected' ), true );
     }
 
     /**

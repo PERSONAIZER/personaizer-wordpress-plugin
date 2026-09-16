@@ -75,23 +75,23 @@ class Personaizer_Backfill {
      * Begin (or restart) a catch-up. Safe to call repeatedly — it resets progress and
      * re-arms the cron, which is exactly what "Resync everything now" should do.
      *
-     * @param string[]|null $lanes Lane ids to walk, or null for every lane that is currently switched on.
-     *                             Scoped runs exist because switching ONE lane back on shouldn't re-walk a
+     * @param string[]|null $streams Stream ids to walk, or null for every stream that is currently switched on.
+     *                             Scoped runs exist because switching ONE stream back on shouldn't re-walk a
      *                             500-product catalog that was never stale.
      */
-    public static function start( ?array $lanes = null ) {
-        // A run already in flight (the initial connect walk) must never be NARROWED to the lane that just
+    public static function start( ?array $streams = null ) {
+        // A run already in flight (the initial connect walk) must never be NARROWED to the stream that just
         // changed — that would silently abandon the rest of the catch-up, and the owner would be left with
-        // a half-taught AI and a progress bar claiming it finished. Widening to every syncing lane is a
+        // a half-taught AI and a progress bar claiming it finished. Widening to every syncing stream is a
         // superset of both scopes, and re-walking an unchanged post is a no-op on our side (same content
         // hash → no re-embed), so the cost is round trips, not money or correctness.
-        $scope = $lanes;
+        $scope = $streams;
         if ( $scope !== null && self::progress()['running'] ) {
             $scope = null;
         }
 
         update_option( self::STATE, [
-            'lanes'           => $scope,
+            'streams'           => $scope,
             'posts_total'     => self::count_posts( $scope ),
             'posts_offset'    => 0,
             'products_total'  => self::count_products( $scope ),
@@ -120,11 +120,11 @@ class Personaizer_Backfill {
             return;
         }
 
-        // Products FIRST, then content. On a plan too small to hold everything, whichever lane walks
+        // Products FIRST, then content. On a plan too small to hold everything, whichever stream walks
         // first wins the quota — and for a store the catalog is what the chat is for. Walking content
         // first (the old order) let blog posts outrank the products a customer actually asks about, so a
         // constrained shop ended up with an AI that knew its "Hello World" post and zero of its catalog.
-        // run_products no-ops instantly when there's no WooCommerce or the lane is off, so a content-only
+        // run_products no-ops instantly when there's no WooCommerce or the stream is off, so a content-only
         // site is unaffected — this only reorders when products actually exist.
         // Arm a WATCHDOG before touching anything. The re-arm at the bottom only runs if this request
         // survives — and a walk is exactly the kind of work that doesn't: a hard max_execution_time, an
@@ -151,7 +151,7 @@ class Personaizer_Backfill {
             $state['finished_at'] = time();
             update_option( self::STATE, $state, false );
             wp_clear_scheduled_hook( self::HOOK );   // done — drop the watchdog
-            // A walk only ever ADDS. The manifest that follows is what proves the lanes are 1:1 with the
+            // A walk only ever ADDS. The manifest that follows is what proves the streams are 1:1 with the
             // site — and catches anything a batch failed on.
             Personaizer_Manifest::start();
         }
@@ -159,9 +159,9 @@ class Personaizer_Backfill {
 
     /** @return bool true when this tick consumed a batch (i.e. there may be more). */
     private static function run_posts( array &$state ) {
-        // A state written before scoped runs existed has no 'lanes' key — null means every syncing lane,
+        // A state written before scoped runs existed has no 'streams' key — null means every syncing stream,
         // which is exactly what those runs meant.
-        $types = self::enabled_post_types( $state['lanes'] ?? null );
+        $types = self::enabled_post_types( $state['streams'] ?? null );
         if ( empty( $types ) || $state['posts_offset'] >= $state['posts_total'] ) return false;
 
         // Offset paging is stable here: we order by ID and nothing in this loop changes
@@ -202,7 +202,7 @@ class Personaizer_Backfill {
 
     /** @return bool true when this tick consumed a batch. */
     private static function run_products( array &$state ) {
-        if ( ! self::products_in_scope( $state['lanes'] ?? null ) ) return false;
+        if ( ! self::products_in_scope( $state['streams'] ?? null ) ) return false;
         $sync = personaizer_woocommerce_sync();
         if ( ! $sync || $state['products_offset'] >= $state['products_total'] ) return false;
 
@@ -258,29 +258,29 @@ class Personaizer_Backfill {
     }
 
     /**
-     * The post types to walk: the lanes switched on (per the connector), narrowed to the run's scope.
+     * The post types to walk: the streams switched on (per the integration), narrowed to the run's scope.
      *
-     * The scope is lane ids, so it maps through personaizer_lanes() rather than assuming lane id === post
+     * The scope is stream ids, so it maps through personaizer_streams() rather than assuming stream id === post
      * type — that holds for custom types but not for pages or posts.
      *
-     * @param string[]|null $scope Lane ids, or null for no narrowing.
+     * @param string[]|null $scope Stream ids, or null for no narrowing.
      */
     private static function enabled_post_types( ?array $scope = null ) {
-        $lanes = personaizer_lanes();
+        $streams = personaizer_streams();
         $types = [];
-        // Intersect with what is switched on rather than trust the scope: a lane can be in scope but off by
+        // Intersect with what is switched on rather than trust the scope: a stream can be in scope but off by
         // the time the tick runs (switched off on personaizer.com in between), and the push would be refused.
-        foreach ( personaizer_current_lanes() as $lane ) {
-            if ( $lane === 'products' || ! isset( $lanes[ $lane ] ) ) continue;
-            if ( $scope !== null && ! in_array( $lane, $scope, true ) ) continue;
-            $types[] = $lanes[ $lane ]['post_type'];
+        foreach ( personaizer_current_streams() as $stream ) {
+            if ( $stream === 'products' || ! isset( $streams[ $stream ] ) ) continue;
+            if ( $scope !== null && ! in_array( $stream, $scope, true ) ) continue;
+            $types[] = $streams[ $stream ]['post_type'];
         }
         return $types;
     }
 
-    /** Whether this run should walk the WooCommerce catalog. @param string[]|null $scope Lane ids. */
+    /** Whether this run should walk the WooCommerce catalog. @param string[]|null $scope Stream ids. */
     private static function products_in_scope( ?array $scope = null ) {
-        if ( ! class_exists( 'WooCommerce' ) || ! in_array( 'products', personaizer_current_lanes(), true ) ) return false;
+        if ( ! class_exists( 'WooCommerce' ) || ! in_array( 'products', personaizer_current_streams(), true ) ) return false;
         return $scope === null || in_array( 'products', $scope, true );
     }
 

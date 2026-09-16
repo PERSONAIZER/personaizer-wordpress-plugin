@@ -9,7 +9,7 @@
  */
 ( function () {
     // ONE refresh for the whole page, decided once. Four things can be in flight — the persona
-    // building (ours), the content backfill and the lane check (this site's cron), and the backend still
+    // building (ours), the content backfill and the stream check (this site's cron), and the backend still
     // processing already-pushed docs — each could otherwise arm its own timer, so this keeps it to a
     // single reload.
     if ( window.PersonaizerAdminPage && window.PersonaizerAdminPage.autoReload ) {

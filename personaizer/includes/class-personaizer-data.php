@@ -17,14 +17,14 @@ class Personaizer_Data {
     /** Every option the plugin persists in wp_options. */
     const OPTIONS = [
         // Connection — provisioned by Connect.
-        'personaizer_connector_id',
-        'personaizer_connector_key',
+        'personaizer_integration_id',
+        'personaizer_integration_key',
         'personaizer_brand_id',
         'personaizer_persona_id',
         'personaizer_identity_secret',
         'personaizer_identify_users',
-        // What personaizer.com last said about the connector, and how syncing is going.
-        'personaizer_connector_state',
+        // What personaizer.com last said about the integration, and how syncing is going.
+        'personaizer_integration_state',
         'personaizer_backfill_state',
         'personaizer_manifest_state',
         'personaizer_manifest_result',
@@ -40,10 +40,10 @@ class Personaizer_Data {
      * an upgraded install never carries a credential or a setting that nothing reads any more.
      */
     const RETIRED_OPTIONS = [
-        // 1.x: the persona's secret key did the syncing; 2.0 syncs with the connector key.
+        // 1.x: the persona's secret key did the syncing; 2.0 syncs with the integration key.
         'personaizer_secret_key',
         'personaizer_connected_at',
-        // 1.x: which lanes sync was a local setting; 2.0 reads it from the connector.
+        // 1.x: which streams sync was a local setting; 2.0 reads it from the integration.
         'personaizer_sync_post_types',
         'personaizer_sync_products',
         // < 1.3: appearance/behavior (now on the persona's Widget tab) and AI Search.

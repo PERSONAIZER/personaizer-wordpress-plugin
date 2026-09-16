@@ -3,7 +3,7 @@
  * Plugin Name: PERSONAIZER
  * Plugin URI:  https://personaizer.com/wordpress
  * Description: Connect your site to PERSONAIZER in one click — the AI chat widget goes live and your pages, posts and products stay in sync with it.
- * Version:     2.0.0
+ * Version:     2.1.0
  * Requires at least: 5.6
  * Requires PHP: 7.4
  * Author:      PERSONAIZER
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * the header would be wasted work. build-zip.sh refuses to package when the constant, the header and
  * readme.txt's Stable tag disagree, so the copy cannot drift in silence.
  */
-define( 'PERSONAIZER_VERSION', '2.0.0' );
+define( 'PERSONAIZER_VERSION', '2.1.0' );
 define( 'PERSONAIZER_PLUGIN_FILE', __FILE__ );
 
 /**
@@ -105,9 +105,9 @@ if ( ! defined( 'PERSONAIZER_APP_URL' ) ) {
 
 /**
  * The dashboard consent screen for one-click Connect. The plugin sends the owner here with a PKCE
- * challenge + its callback; the owner picks the brand this site feeds, a widget persona and the lanes to
+ * challenge + its callback; the owner picks the brand this site feeds, a widget persona and the streams to
  * sync, and we're redirected back with a single-use code the plugin's server exchanges (at
- * PERSONAIZER_API_URL/api/integrations/connect/token) for the connector credential (plus the persona's id
+ * PERSONAIZER_API_URL/api/integrations/connect/token) for the integration credential (plus the persona's id
  * and Identity Secret when one was picked). Follows PERSONAIZER_APP_URL unless set outright.
  */
 if ( ! defined( 'PERSONAIZER_CONNECT_URL' ) ) {
@@ -120,18 +120,18 @@ function personaizer_app_url( $path = '' ) {
 }
 
 /**
- * The lanes this site can teach: one per content type. A lane is the unit the owner switches on and off on
- * personaizer.com (the backend files each lane into its own source — `<host>-<lane>` — so "stop using my
+ * The streams this site can teach: one per content type. A stream is the unit the owner switches on and off on
+ * personaizer.com (the backend files each stream into its own source — `<host>-<stream>` — so "stop using my
  * products, keep my pages" is a thing the owner can express, without deleting anything).
  *
- * @return array<string,array{label:string,post_type:string}> keyed by lane id.
+ * @return array<string,array{label:string,post_type:string}> keyed by stream id.
  */
-function personaizer_lanes() {
-    $lanes = array(
+function personaizer_streams() {
+    $streams = array(
         'pages' => array( 'label' => 'Pages', 'post_type' => 'page' ),
         'posts' => array( 'label' => 'Posts', 'post_type' => 'post' ),
     );
-    // A custom type is just another lane — same source shape, same controls. Nothing about this is special
+    // A custom type is just another stream — same source shape, same controls. Nothing about this is special
     // cased, which is the point: a site with a Recipes type gets Recipes beside Pages, and the ~95% without
     // one never learn the concept exists.
     $extra = personaizer_extra_post_types();
@@ -151,85 +151,85 @@ function personaizer_lanes() {
 
     foreach ( $extra as $type ) {
         $label = $type->labels->name;
-        $lanes[ $type->name ] = array(
+        $streams[ $type->name ] = array(
             'label'     => $seen[ $label ] > 1 ? $label . ' (' . $type->name . ')' : $label,
             'post_type' => $type->name,
         );
     }
     if ( class_exists( 'WooCommerce' ) ) {
-        $lanes['products'] = array( 'label' => 'Products', 'post_type' => 'product' );
+        $streams['products'] = array( 'label' => 'Products', 'post_type' => 'product' );
     }
-    return $lanes;
+    return $streams;
 }
 
 /**
- * The lanes switched ON — read from the connector on personaizer.com, where the owner switches them.
+ * The streams switched ON — read from the integration on personaizer.com, where the owner switches them.
  *
  * Never a local option: a local copy would be a second source of truth, free to drift, and the plugin would
- * confidently push into a lane the owner closed an hour ago. The connector read is cached for a minute; when
+ * confidently push into a stream the owner closed an hour ago. The integration read is cached for a minute; when
  * personaizer.com can't be reached the last state it DID report stands in, so a blip never reads as "every
- * lane off" (which would silently drop edits on the floor with nothing to retry them).
+ * stream off" (which would silently drop edits on the floor with nothing to retry them).
  *
- * @return string[] lane ids.
+ * @return string[] stream ids.
  */
-function personaizer_current_lanes() {
-    $connector = personaizer_connector();
-    if ( ! is_array( $connector ) ) return array();
+function personaizer_current_streams() {
+    $integration = personaizer_integration();
+    if ( ! is_array( $integration ) ) return array();
     $out = array();
-    foreach ( $connector['lanes'] as $lane => $state ) {
-        if ( ! empty( $state['enabled'] ) ) $out[] = $lane;
+    foreach ( $integration['streams'] as $stream => $state ) {
+        if ( ! empty( $state['enabled'] ) ) $out[] = $stream;
     }
     return $out;
 }
 
 /**
- * This site's connector as personaizer.com last reported it — live when reachable, otherwise the last good
+ * This site's integration as personaizer.com last reported it — live when reachable, otherwise the last good
  * answer. Null only before the first successful read after connecting.
  *
- * @return array|null See Personaizer_Api::get_connector().
+ * @return array|null See Personaizer_Api::get_integration().
  */
-function personaizer_connector( $force = false ) {
+function personaizer_integration( $force = false ) {
     if ( ! personaizer_api()->is_configured() ) return null;
-    $live = personaizer_api()->get_connector( $force );
+    $live = personaizer_api()->get_integration( $force );
     if ( is_array( $live ) ) {
-        update_option( 'personaizer_connector_state', $live, false );
+        update_option( 'personaizer_integration_state', $live, false );
         return $live;
     }
-    $last = get_option( 'personaizer_connector_state', null );
+    $last = get_option( 'personaizer_integration_state', null );
     return is_array( $last ) ? $last : null;
 }
 
-/** The lane a WordPress post type belongs to. Every synced type has one. */
-function personaizer_lane_for_post_type( $post_type ) {
+/** The stream a WordPress post type belongs to. Every synced type has one. */
+function personaizer_stream_for_post_type( $post_type ) {
     if ( $post_type === 'page' ) return 'pages';
     if ( $post_type === 'post' ) return 'posts';
     if ( $post_type === 'product' ) return 'products';
-    return $post_type; // custom types are their own lane
+    return $post_type; // custom types are their own stream
 }
 
 /**
- * Removals that happened while a lane was frozen, waiting for that lane to sync again.
+ * Removals that happened while a stream was frozen, waiting for that stream to sync again.
  *
- * The gap this closes: a frozen lane pushes nothing, so trashing a page while it's frozen never reaches
+ * The gap this closes: a frozen stream pushes nothing, so trashing a page while it's frozen never reaches
  * the AI, and the catch-up walk on resume can't repair it — that walk visits PUBLISHED posts, so a page
  * that no longer exists is precisely what it cannot see. The doc would outlive the page forever.
  *
  * Why a queue rather than a reconcile that lists the AI's docs and drops whatever has no matching post:
- * WordPress TELLS us the moment a post is trashed or unpublished even while the lane is frozen — we
+ * WordPress TELLS us the moment a post is trashed or unpublished even while the stream is frozen — we
  * simply had nowhere to put the fact. Inferring it back later is a far more dangerous instrument than it
  * looks, because it deduces deletion from two lists that can each lie:
  *
  *   - "what the site has" can under-report, and then every surviving doc looks like an orphan. WPML forces
  *     suppress_filters off so get_posts() answers for ONE language; deactivating WooCommerce unregisters
  *     `product` outright. Either turns a routine sweep into a mass delete.
-   (The lane manifest — Personaizer_Manifest — is the one place deletion IS deduced, and it runs on the
- *   backend behind its own rails: a manifest is sent only for a lane this site can enumerate fully, and
- *   a manifest that would orphan a large share of a lane is held until the next one agrees.)
+   (The stream manifest — Personaizer_Manifest — is the one place deletion IS deduced, and it runs on the
+ *   backend behind its own rails: a manifest is sent only for a stream this site can enumerate fully, and
+ *   a manifest that would orphan a large share of a stream is held until the next one agrees.)
  *
  * Deletion is not reversible on our side. So we record what we witnessed instead of deducing what we
  * didn't. Every note is still re-checked against the live site before it's acted on (see flush).
  *
- * Shape: [ lane => [ external_id => post_id ] ] — keyed by external_id so re-queuing dedupes, and the
+ * Shape: [ stream => [ external_id => post_id ] ] — keyed by external_id so re-queuing dedupes, and the
  * post id is kept so the flush can ask WordPress whether the note is still true.
  */
 function personaizer_pending_removals() {
@@ -238,9 +238,9 @@ function personaizer_pending_removals() {
 }
 
 /** Note that a post is gone, to be applied by the next flush. */
-function personaizer_remember_removal( $lane, $external_id, $post_id ) {
+function personaizer_remember_removal( $stream, $external_id, $post_id ) {
     $queue = personaizer_pending_removals();
-    $queue[ $lane ][ $external_id ] = (int) $post_id;
+    $queue[ $stream ][ $external_id ] = (int) $post_id;
     update_option( 'personaizer_pending_removals', $queue, false );
     personaizer_arm_removal_flush();
 }
@@ -271,32 +271,32 @@ function personaizer_arm_removal_flush() {
 }
 
 /**
- * Apply the queued removals for lanes that just started syncing again.
+ * Apply the queued removals for streams that just started syncing again.
  *
- * Each note is re-checked against the live site first: a page trashed and then restored while the lane was
+ * Each note is re-checked against the live site first: a page trashed and then restored while the stream was
  * frozen is still queued, and acting on a note written days ago would delete a page that is live right
  * now. That check is what makes over-queuing harmless, which in turn lets the recording side stay dumb —
  * it can note anything that looks like a removal without having to be right.
  *
- * @param string[]|null $lanes Lane ids to apply, or null for every lane holding notes.
+ * @param string[]|null $streams Stream ids to apply, or null for every stream holding notes.
  * @param float          $budget_seconds Stop after this long and leave the rest queued; 0 = no limit.
  * @return int Docs asked to be removed.
  */
-function personaizer_flush_removals( ?array $lanes = null, $budget_seconds = 0 ) {
+function personaizer_flush_removals( ?array $streams = null, $budget_seconds = 0 ) {
     $queue = personaizer_pending_removals();
-    if ( $lanes === null ) $lanes = array_keys( $queue );
+    if ( $streams === null ) $streams = array_keys( $queue );
 
     $started = microtime( true );
     $removed = 0;
 
-    foreach ( $lanes as $lane ) {
-        if ( empty( $queue[ $lane ] ) ) continue;
+    foreach ( $streams as $stream ) {
+        if ( empty( $queue[ $stream ] ) ) continue;
 
         $ids = array();
-        foreach ( (array) $queue[ $lane ] as $external_id => $post_id ) {
+        foreach ( (array) $queue[ $stream ] as $external_id => $post_id ) {
             $post = get_post( (int) $post_id );
             if ( $post && $post->post_status === 'publish' ) {
-                unset( $queue[ $lane ][ $external_id ] );   // it came back — the note is stale
+                unset( $queue[ $stream ][ $external_id ] );   // it came back — the note is stale
                 continue;
             }
             $ids[] = (string) $external_id;
@@ -313,7 +313,7 @@ function personaizer_flush_removals( ?array $lanes = null, $budget_seconds = 0 )
                 update_option( 'personaizer_pending_removals', $queue, false );
                 return $removed;
             }
-            foreach ( $chunk as $external_id ) unset( $queue[ $lane ][ $external_id ] );
+            foreach ( $chunk as $external_id ) unset( $queue[ $stream ][ $external_id ] );
             $removed += count( $chunk );
 
             // A catalog-sized queue must not take the request down with it — stopping mid-way is safe
@@ -323,7 +323,7 @@ function personaizer_flush_removals( ?array $lanes = null, $budget_seconds = 0 )
                 return $removed;
             }
         }
-        if ( empty( $queue[ $lane ] ) ) unset( $queue[ $lane ] );
+        if ( empty( $queue[ $stream ] ) ) unset( $queue[ $stream ] );
     }
 
     update_option( 'personaizer_pending_removals', $queue, false );
@@ -352,7 +352,7 @@ add_action( Personaizer_Backfill::HOOK, function () {
  * re-remembered. So a network blip during replay loses nothing: the item is neither pushed nor forgotten,
  * it simply stays queued.
  *
- * Shape mirrors pending_removals: [ lane => [ external_id => post_id ] ] — keyed by external_id so
+ * Shape mirrors pending_removals: [ stream => [ external_id => post_id ] ] — keyed by external_id so
  * re-queuing dedupes, post_id kept so replay can re-map the live item.
  */
 function personaizer_pending_overflow() {
@@ -361,9 +361,9 @@ function personaizer_pending_overflow() {
 }
 
 /** Note that an item didn't fit the plan's knowledge quota, to be replayed when the plan gains room. */
-function personaizer_remember_overflow( $lane, $external_id, $post_id ) {
+function personaizer_remember_overflow( $stream, $external_id, $post_id ) {
     $queue = personaizer_pending_overflow();
-    $queue[ $lane ][ (string) $external_id ] = (int) $post_id;
+    $queue[ $stream ][ (string) $external_id ] = (int) $post_id;
     update_option( 'personaizer_pending_overflow', $queue, false );
 }
 
@@ -371,28 +371,28 @@ function personaizer_remember_overflow( $lane, $external_id, $post_id ) {
  * Drop items from the queue once they've landed — called from the sync paths on a SUCCESSFUL push, so the
  * set empties itself as space frees up and no separate reconciliation is ever needed.
  *
- * @param string   $lane
+ * @param string   $stream
  * @param string[] $external_ids
  */
-function personaizer_forget_overflow( $lane, array $external_ids ) {
+function personaizer_forget_overflow( $stream, array $external_ids ) {
     $queue = personaizer_pending_overflow();
-    if ( empty( $queue[ $lane ] ) ) return;   // nothing queued for this lane — the common case, skip the write
+    if ( empty( $queue[ $stream ] ) ) return;   // nothing queued for this stream — the common case, skip the write
     $changed = false;
     foreach ( $external_ids as $external_id ) {
-        if ( isset( $queue[ $lane ][ (string) $external_id ] ) ) {
-            unset( $queue[ $lane ][ (string) $external_id ] );
+        if ( isset( $queue[ $stream ][ (string) $external_id ] ) ) {
+            unset( $queue[ $stream ][ (string) $external_id ] );
             $changed = true;
         }
     }
     if ( ! $changed ) return;
-    if ( empty( $queue[ $lane ] ) ) unset( $queue[ $lane ] );
+    if ( empty( $queue[ $stream ] ) ) unset( $queue[ $stream ] );
     update_option( 'personaizer_pending_overflow', $queue, false );
 }
 
 /**
  * A stable fingerprint of exactly what we would send for one item.
  *
- * Sent with every push and stored by the backend on the doc; the lane manifest (Personaizer_Manifest) sends
+ * Sent with every push and stored by the backend on the doc; the stream manifest (Personaizer_Manifest) sends
  * the same fingerprints again and the backend answers which items it holds a different one for. Because it
  * hashes the mapper's ACTUAL OUTPUT, it changes
  * whenever anything that reaches the AI changes — the merchant edits a price, or WE change how a product
@@ -436,7 +436,7 @@ function personaizer_payload_hash( $payload ) {
  * item-by-item (see Personaizer_WooCommerce_Sync::push), so a bad item only ever costs itself, and even
  * that one is remembered here rather than dropped.
  *
- * Same shape and same self-correcting contract as pending_overflow: [ lane => [ external_id => post_id ] ],
+ * Same shape and same self-correcting contract as pending_overflow: [ stream => [ external_id => post_id ] ],
  * additive replay, forgotten the moment an item lands, so over-recording is harmless.
  */
 function personaizer_pending_retry() {
@@ -445,29 +445,29 @@ function personaizer_pending_retry() {
 }
 
 /** Note that an item failed to write, to be re-tried on the next catch-up tick. */
-function personaizer_remember_retry( $lane, $external_id, $post_id ) {
+function personaizer_remember_retry( $stream, $external_id, $post_id ) {
     $queue = personaizer_pending_retry();
-    $queue[ $lane ][ (string) $external_id ] = (int) $post_id;
+    $queue[ $stream ][ (string) $external_id ] = (int) $post_id;
     update_option( 'personaizer_pending_retry', $queue, false );
 }
 
 /** Drop items from the retry queue once they've landed — called from every successful push. */
-function personaizer_forget_retry( $lane, array $external_ids ) {
+function personaizer_forget_retry( $stream, array $external_ids ) {
     $queue = personaizer_pending_retry();
-    if ( empty( $queue[ $lane ] ) ) return;   // nothing queued for this lane — the common case, skip the write
+    if ( empty( $queue[ $stream ] ) ) return;   // nothing queued for this stream — the common case, skip the write
     $changed = false;
     foreach ( $external_ids as $external_id ) {
-        if ( isset( $queue[ $lane ][ (string) $external_id ] ) ) {
-            unset( $queue[ $lane ][ (string) $external_id ] );
+        if ( isset( $queue[ $stream ][ (string) $external_id ] ) ) {
+            unset( $queue[ $stream ][ (string) $external_id ] );
             $changed = true;
         }
     }
     if ( ! $changed ) return;
-    if ( empty( $queue[ $lane ] ) ) unset( $queue[ $lane ] );
+    if ( empty( $queue[ $stream ] ) ) unset( $queue[ $stream ] );
     update_option( 'personaizer_pending_retry', $queue, false );
 }
 
-/** How many items failed to write and are waiting to be re-tried, across every lane. */
+/** How many items failed to write and are waiting to be re-tried, across every stream. */
 function personaizer_retry_count() {
     $n = 0;
     foreach ( personaizer_pending_retry() as $items ) {
@@ -477,28 +477,28 @@ function personaizer_retry_count() {
 }
 
 /**
- * Re-push everything in the retry queue, for lanes still syncing.
+ * Re-push everything in the retry queue, for streams still syncing.
  *
  * Deliberately NOT gated on plan headroom (unlike the overflow catch-up): these items failed for reasons
  * unrelated to quota, so waiting for an upgrade that may never come would strand them forever. The normal
  * sync paths re-classify on the way through — an item that turns out to be a quota problem moves itself to
  * the overflow queue, one that lands is forgotten, one that fails again simply stays queued.
  *
- * @param string[]|null $lanes Lane ids to replay, or null for every lane with something queued.
+ * @param string[]|null $streams Stream ids to replay, or null for every stream with something queued.
  * @return int items pushed.
  */
-function personaizer_flush_retry( $lanes = null ) {
+function personaizer_flush_retry( $streams = null ) {
     $queue = personaizer_pending_retry();
     if ( empty( $queue ) ) return 0;
 
-    $active = personaizer_current_lanes();
-    $scope  = $lanes === null ? array_keys( $queue ) : (array) $lanes;
+    $active = personaizer_current_streams();
+    $scope  = $streams === null ? array_keys( $queue ) : (array) $streams;
     $pushed = 0;
 
-    foreach ( $scope as $lane ) {
-        if ( empty( $queue[ $lane ] ) || ! in_array( $lane, $active, true ) ) continue;
-        $post_ids = array_map( 'intval', array_values( $queue[ $lane ] ) );
-        if ( $lane === 'products' ) {
+    foreach ( $scope as $stream ) {
+        if ( empty( $queue[ $stream ] ) || ! in_array( $stream, $active, true ) ) continue;
+        $post_ids = array_map( 'intval', array_values( $queue[ $stream ] ) );
+        if ( $stream === 'products' ) {
             $sync = personaizer_woocommerce_sync();
             if ( $sync ) $pushed += $sync->sync_ids( $post_ids );
         } else {
@@ -508,7 +508,7 @@ function personaizer_flush_retry( $lanes = null ) {
     return $pushed;
 }
 
-/** How many items are waiting for plan space, across every lane. */
+/** How many items are waiting for plan space, across every stream. */
 function personaizer_overflow_count() {
     $n = 0;
     foreach ( personaizer_pending_overflow() as $items ) {
@@ -518,27 +518,27 @@ function personaizer_overflow_count() {
 }
 
 /**
- * Replay the overflow queue for lanes that are switched on.
+ * Replay the overflow queue for streams that are switched on.
  *
  * Re-pushes each remembered item through its normal sync path; the push forgets what lands and
- * re-remembers what still doesn't fit, so the queue self-corrects. Only lanes switched on are touched —
- * a push into a lane the owner switched off is refused anyway.
+ * re-remembers what still doesn't fit, so the queue self-corrects. Only streams switched on are touched —
+ * a push into a stream the owner switched off is refused anyway.
  *
- * @param string[]|null $lanes Lane ids to replay, or null for every lane with something queued.
+ * @param string[]|null $streams Stream ids to replay, or null for every stream with something queued.
  * @return int items pushed.
  */
-function personaizer_flush_overflow( $lanes = null ) {
+function personaizer_flush_overflow( $streams = null ) {
     $queue = personaizer_pending_overflow();
     if ( empty( $queue ) ) return 0;
 
-    $active = personaizer_current_lanes();
-    $scope  = $lanes === null ? array_keys( $queue ) : (array) $lanes;
+    $active = personaizer_current_streams();
+    $scope  = $streams === null ? array_keys( $queue ) : (array) $streams;
     $pushed = 0;
 
-    foreach ( $scope as $lane ) {
-        if ( empty( $queue[ $lane ] ) || ! in_array( $lane, $active, true ) ) continue;
-        $post_ids = array_map( 'intval', array_values( $queue[ $lane ] ) );
-        if ( $lane === 'products' ) {
+    foreach ( $scope as $stream ) {
+        if ( empty( $queue[ $stream ] ) || ! in_array( $stream, $active, true ) ) continue;
+        $post_ids = array_map( 'intval', array_values( $queue[ $stream ] ) );
+        if ( $stream === 'products' ) {
             $sync = personaizer_woocommerce_sync();
             if ( $sync ) $pushed += $sync->sync_ids( $post_ids );
         } else {
@@ -564,7 +564,7 @@ function personaizer_upgrade_url() {
  * The catch-up: re-push what failed to write, and — when the plan has room — what didn't fit.
  *
  * Runs on the daily tick (hands-off), armed on demand right after the owner reopens the plugin, and armed
- * by the lane manifest when personaizer.com reports items missing or stale. Additive only, so it can never
+ * by the stream manifest when personaizer.com reports items missing or stale. Additive only, so it can never
  * fight the manifest's deletions.
  */
 function personaizer_catch_up() {
@@ -593,36 +593,36 @@ add_action( Personaizer_Daily::HOOK, 'personaizer_catch_up' );
 add_action( 'personaizer_catch_up', 'personaizer_catch_up' );
 
 /**
- * Every lane's real state, for the settings page: switched on or off (the owner's choice on personaizer.com),
+ * Every stream's real state, for the settings page: switched on or off (the owner's choice on personaizer.com),
  * how much is on each side, and what the last manifest found.
  *
- * `known` and `count` are deliberately separate and deliberately both shown. While a lane syncs they agree
+ * `known` and `count` are deliberately separate and deliberately both shown. While a stream syncs they agree
  * and the distinction is invisible. The moment it stops they diverge — delete a product and the site has 16
  * while the AI still has 17 — and that gap IS the state the owner came to this screen to understand.
  *
- * @param array|null $connector From personaizer_connector(); null when personaizer.com never answered.
+ * @param array|null $integration From personaizer_integration(); null when personaizer.com never answered.
  * @return array<string,array{label:string,enabled:bool,offered:bool,count:int,known:?int,ready:?int,overflow:int,reconciliation:?array}>
  */
-function personaizer_lane_states( $connector ) {
-    $known    = is_array( $connector ) ? $connector['lanes'] : array();
+function personaizer_stream_states( $integration ) {
+    $known    = is_array( $integration ) ? $integration['streams'] : array();
     $counts   = personaizer_syncable_counts();
     $overflow = personaizer_pending_overflow();
     $out      = array();
 
-    foreach ( personaizer_lanes() as $lane => $meta ) {
-        $row = isset( $known[ $lane ] ) ? $known[ $lane ] : null;
-        $out[ $lane ] = array(
+    foreach ( personaizer_streams() as $stream => $meta ) {
+        $row = isset( $known[ $stream ] ) ? $known[ $stream ] : null;
+        $out[ $stream ] = array(
             'label'          => $meta['label'],
             // Off when the owner switched it off; also off when they never switched it on (no source yet).
             'enabled'        => $row !== null && ! empty( $row['enabled'] ),
             // Has a source at all — the difference between "switched off" and "never switched on".
             'offered'        => $row !== null,
-            'count'          => (int) ( $counts[ $lane ] ?? 0 ),
-            // doc_count when the lane has a source; 0 when it has none (the AI genuinely holds nothing here);
+            'count'          => (int) ( $counts[ $stream ] ?? 0 ),
+            // doc_count when the stream has a source; 0 when it has none (the AI genuinely holds nothing here);
             // null only when personaizer.com never answered, and callers render "—" for that.
-            'known'          => $row !== null ? (int) $row['doc_count'] : ( is_array( $connector ) ? 0 : null ),
-            'ready'          => $row !== null ? (int) $row['ready_count'] : ( is_array( $connector ) ? 0 : null ),
-            'overflow'       => isset( $overflow[ $lane ] ) ? count( (array) $overflow[ $lane ] ) : 0,
+            'known'          => $row !== null ? (int) $row['doc_count'] : ( is_array( $integration ) ? 0 : null ),
+            'ready'          => $row !== null ? (int) $row['ready_count'] : ( is_array( $integration ) ? 0 : null ),
+            'overflow'       => isset( $overflow[ $stream ] ) ? count( (array) $overflow[ $stream ] ) : 0,
             'reconciliation' => $row !== null ? $row['reconciliation'] : null,
         );
     }
@@ -667,7 +667,7 @@ function personaizer_woocommerce_sync() {
 add_action( 'plugins_loaded', 'personaizer_woocommerce_sync', 20 );
 
 // "Resync everything now" — the manual re-run of the catch-up that connecting starts for you.
-// One action for posts AND products: the owner thinks "re-teach my AI", not "which lane?". It only
+// One action for posts AND products: the owner thinks "re-teach my AI", not "which stream?". It only
 // arms the background worker, so it returns instantly no matter how big the site is.
 /**
  * The version WordPress reads from the plugin file ON DISK.
@@ -728,7 +728,7 @@ add_action( 'upgrader_process_complete', function ( $upgrader, $hook_extra ) {
 // "Try to clear it now" — the banner's one action.
 add_action( 'admin_post_personaizer_flush_opcache', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
-    check_admin_referer( 'personaizer_flush_opcache' );
+    cheik_admin_referer( 'personaizer_flush_opcache' );
     // Nothing is reported back on purpose: this request is still running the STALE code, so it cannot
     // observe its own success. The reload lands on fresh code if it worked — and if the banner is still
     // there afterwards, the host blocked it and the answer is a real cache clear or a PHP restart.
@@ -737,12 +737,12 @@ add_action( 'admin_post_personaizer_flush_opcache', function () {
     exit;
 } );
 
-// "Check now" — start a lane manifest walk. It runs on WP-Cron in slices (a 10 000-product catalog does
+// "Check now" — start a stream manifest walk. It runs on WP-Cron in slices (a 10 000-product catalog does
 // not fingerprint inside one request); the settings page shows its progress and, when it lands, what
 // personaizer.com found — and the retry queue pushes whatever was missing or stale.
 add_action( 'admin_post_personaizer_check', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
-    check_admin_referer( 'personaizer_check' );
+    cheik_admin_referer( 'personaizer_check' );
     Personaizer_Manifest::start();
     wp_safe_redirect( add_query_arg( [ 'page' => 'personaizer' ], admin_url( 'admin.php' ) ) );
     exit;
@@ -750,7 +750,7 @@ add_action( 'admin_post_personaizer_check', function () {
 
 add_action( 'admin_post_personaizer_resync', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
-    check_admin_referer( 'personaizer_resync' );
+    cheik_admin_referer( 'personaizer_resync' );
     Personaizer_Backfill::start();
     // No "you clicked it" flag in the URL: the sync line on the page reads the real progress and says
     // either "Syncing… 4 of 28" or "Synced 1 second ago". Both are an honest answer to the click, and
@@ -762,14 +762,14 @@ add_action( 'admin_post_personaizer_resync', function () {
 // "Disconnect" — unlink this site without deleting the plugin.
 //
 // The consent screen tells owners they can disconnect at any time, so there has to be a way to do it
-// that isn't "delete the plugin and hope". personaizer.com is told first, so the connector there freezes
-// (its lanes switch off — nothing is deleted); then everything WE stored on THIS site goes. The persona
+// that isn't "delete the plugin and hope". personaizer.com is told first, so the integration there freezes
+// (its streams switch off — nothing is deleted); then everything WE stored on THIS site goes. The persona
 // and everything it learned stay on personaizer.com, so reconnecting resumes rather than restarts.
 add_action( 'admin_post_personaizer_disconnect', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
-    check_admin_referer( 'personaizer_disconnect' );
+    cheik_admin_referer( 'personaizer_disconnect' );
     // Best-effort: a site that can't reach personaizer.com right now must still be able to let go locally;
-    // the owner can freeze or delete the connector from the dashboard.
+    // the owner can freeze or delete the integration from the dashboard.
     $told = personaizer_api()->disconnect();
     if ( is_wp_error( $told ) ) personaizer_debug_log( 'disconnect: personaizer.com not told — ' . $told->get_error_message() );
     Personaizer_Data::clear();
@@ -796,12 +796,12 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( $li
 } );
 
 // ── One-click Connect (OAuth Authorization-Code + PKCE) ───────────────────────
-// The owner clicks Connect → picks the brand, a widget persona and the lanes on personaizer.com → we
-// exchange a single-use, PKCE-bound code server-to-server for this site's connector credential. No client
+// The owner clicks Connect → picks the brand, a widget persona and the streams on personaizer.com → we
+// exchange a single-use, PKCE-bound code server-to-server for this site's integration credential. No client
 // secret ships in the plugin — PKCE is the public-client auth.
 
 /** This site's connect callback — the redirect_uri the code is bound to (and re-sent at exchange). */
-function personaizer_connect_callback_url() {
+function personaizer_connect_callbaik_url() {
     return admin_url( 'admin-post.php?action=personaizer_connect_callback' );
 }
 
@@ -811,24 +811,24 @@ function personaizer_b64url( $bin ) {
 }
 
 /**
- * What this site could teach — every lane with its label and published count. Shown on the consent screen
+ * What this site could teach — every stream with its label and published count. Shown on the consent screen
  * BEFORE approving ("it will learn 7 pages, 3 posts and 18 products") and reported to personaizer.com after
- * every connect and daily, so the owner switches lanes on from a list that reflects the site as it is now.
+ * every connect and daily, so the owner switches streams on from a list that reflects the site as it is now.
  *
- * @return array<int,array{lane:string,label:string,count:int}>
+ * @return array<int,array{stream:string,label:string,count:int}>
  */
 function personaizer_inventory() {
     $out = array();
-    foreach ( personaizer_lanes() as $lane => $meta ) {
-        $out[] = array( 'lane' => $lane, 'label' => $meta['label'], 'count' => personaizer_published_count( $meta['post_type'] ) );
+    foreach ( personaizer_streams() as $stream => $meta ) {
+        $out[] = array( 'stream' => $stream, 'label' => $meta['label'], 'count' => personaizer_published_count( $meta['post_type'] ) );
     }
     return $out;
 }
 
-/** @return array<string,int> lane => published count. */
+/** @return array<string,int> stream => published count. */
 function personaizer_syncable_counts() {
     $counts = array();
-    foreach ( personaizer_inventory() as $row ) $counts[ $row['lane'] ] = $row['count'];
+    foreach ( personaizer_inventory() as $row ) $counts[ $row['stream'] ] = $row['count'];
     return $counts;
 }
 
@@ -851,7 +851,7 @@ add_filter( 'allowed_redirect_hosts', function ( $hosts ) {
 // Start: mint a PKCE verifier/challenge + state, stash the verifier server-side, send the owner to consent.
 add_action( 'admin_post_personaizer_connect_start', function () {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden' );
-    check_admin_referer( 'personaizer_connect' );
+    cheik_admin_referer( 'personaizer_connect' );
 
     $verifier  = personaizer_b64url( random_bytes( 48 ) );                  // 64 chars — within PKCE 43..128
     $challenge = personaizer_b64url( hash( 'sha256', $verifier, true ) );   // S256
@@ -866,7 +866,7 @@ add_action( 'admin_post_personaizer_connect_start', function () {
     // for this site"; inventory lets it show WHAT will be learned — the thing being consented to — as real
     // numbers the owner ticks, rather than this plugin deciding for them after the fact.
     $args = array(
-        'redirect_uri'   => personaizer_connect_callback_url(),
+        'redirect_uri'   => personaizer_connect_callbaik_url(),
         'code_challenge' => $challenge,
         'state'          => $state,
         'platform'       => 'wordpress',
@@ -875,13 +875,13 @@ add_action( 'admin_post_personaizer_connect_start', function () {
         'inventory'      => rawurlencode( wp_json_encode( personaizer_inventory() ) ),
     );
 
-    // Reconnecting is a different job from connecting: this site already IS a connector there. Telling the
-    // screen so lets it open on the connector's brand and lanes as they are right now, and mark the widget
+    // Reconnecting is a different job from connecting: this site already IS a integration there. Telling the
+    // screen so lets it open on the integration's brand and streams as they are right now, and mark the widget
     // persona that is live here — instead of offering to build a second one.
     if ( personaizer_api()->is_configured() ) {
         $args['connected'] = '1';
-        $args['connector'] = get_option( 'personaizer_connector_id', '' );
-        $args['scope']     = implode( ',', personaizer_current_lanes() );
+        $args['integration'] = get_option( 'personaizer_integration_id', '' );
+        $args['scope']     = implode( ',', personaizer_current_streams() );
         $args['persona']   = get_option( 'personaizer_persona_id', '' );
     }
 
@@ -916,16 +916,16 @@ add_action( 'admin_post_personaizer_connect_callback', function () {
             'body'    => wp_json_encode( array(
                 'code'          => $code,
                 'code_verifier' => $verifier,
-                'redirect_uri'  => personaizer_connect_callback_url(),
+                'redirect_uri'  => personaizer_connect_callbaik_url(),
                 'site_profile'  => Personaizer_Site_Profile::build(),
             ) ),
         ) );
 
         if ( ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200 ) {
             $data = json_decode( wp_remote_retrieve_body( $resp ), true );
-            if ( ! empty( $data['connector_id'] ) && ! empty( $data['connector_key'] ) ) {
-                update_option( 'personaizer_connector_id', sanitize_text_field( $data['connector_id'] ) );
-                update_option( 'personaizer_connector_key', sanitize_text_field( $data['connector_key'] ) );
+            if ( ! empty( $data['integration_id'] ) && ! empty( $data['integration_key'] ) ) {
+                update_option( 'personaizer_integration_id', sanitize_text_field( $data['integration_id'] ) );
+                update_option( 'personaizer_integration_key', sanitize_text_field( $data['integration_key'] ) );
                 update_option( 'personaizer_brand_id', sanitize_text_field( (string) ( $data['brand_id'] ?? '' ) ) );
                 // The widget persona is optional — a site may sync knowledge without embedding a chat. A
                 // reconnect without one removes the widget; the owner chose that on the consent screen.
@@ -944,12 +944,12 @@ add_action( 'admin_post_personaizer_connect_callback', function () {
                 }
                 if ( $old_persona !== '' ) Personaizer_Api::forget_profile( $old_persona, PERSONAIZER_API_URL );
 
-                // The lanes the owner ticked are already switched on there; read them back, tell personaizer.com
+                // The streams the owner ticked are already switched on there; read them back, tell personaizer.com
                 // what this site holds, and start teaching. The manifest that follows the backfill is what makes
-                // the lanes 1:1 with the site.
+                // the streams 1:1 with the site.
                 Personaizer_Data::clear_retired();
-                personaizer_api()->forget_connector();
-                personaizer_connector( true );
+                personaizer_api()->forget_integration();
+                personaizer_integration( true );
                 personaizer_report_inventory();
                 Personaizer_Backfill::start();
                 $ok = true;
@@ -969,15 +969,15 @@ add_action( 'admin_post_personaizer_connect_callback', function () {
 add_action( 'admin_init', function () {
     // ── Only real settings are registered here. ──
     //
-    // The connection itself — connector id + key, persona id, identity secret — is deliberately NOT
+    // The connection itself — integration id + key, persona id, identity secret — is deliberately NOT
     // registered. Connect provisions them with update_option(); they were never things an owner chooses. And
     // registering them would force us to render them: options.php walks every option in the group and
     // does `update_option($option, null)` for any that isn't in $_POST, so a registered-but-unrendered
     // credential is silently DELETED the first time someone hits Save — disconnecting the site.
     //
     // Appearance/behaviour (theme, position, accent, title, auto-open, nudge) aren't here either: they
-    // live on the persona (its Widget tab). Neither are the lanes: which lanes sync is the owner's choice on
-    // personaizer.com (the connector), read back live — a local copy would be a second source of truth.
+    // live on the persona (its Widget tab). Neither are the streams: which streams sync is the owner's choice on
+    // personaizer.com (the integration), read back live — a local copy would be a second source of truth.
     //
     // The on/off switch for recognising signed-in customers IS a choice. The Identity Secret it uses
     // is not — Connect provisions that (see the note above about why it must stay unregistered).
@@ -1036,7 +1036,7 @@ function personaizer_chat_page() {
 
     $id              = get_option( 'personaizer_persona_id', '' );
     $identify_users  = get_option( 'personaizer_identify_users', '' ) === '1';
-    // Connected = this site is a connector on personaizer.com. The widget persona is a separate, optional
+    // Connected = this site is a integration on personaizer.com. The widget persona is a separate, optional
     // choice made on the consent screen: a site can sync knowledge without embedding a chat.
     $active          = personaizer_api()->is_configured();
     $has_widget      = $active && $id !== '';
@@ -1050,11 +1050,11 @@ function personaizer_chat_page() {
     $progress  = Personaizer_Backfill::progress();
     $last_sync = (int) get_option( 'personaizer_last_sync', 0 );
 
-    // The connector as personaizer.com sees it — read ONCE for the whole page (rows, the summary, the plan
+    // The integration as personaizer.com sees it — read ONCE for the whole page (rows, the summary, the plan
     // card). Live when reachable, the last good answer otherwise; $pz_reachable tells the two apart so the
     // page never presents a stale number as a fresh one.
-    $pz_connector = $active ? personaizer_connector() : null;
-    $pz_reachable = $active && ! is_wp_error( personaizer_api()->get_connector() );
+    $pz_integration = $active ? personaizer_integration() : null;
+    $pz_reachable = $active && ! is_wp_error( personaizer_api()->get_integration() );
 
     // If items are waiting for plan space or a retry, arm a background catch-up. Non-blocking (a one-off
     // cron event), so the page still renders instantly; the handler re-checks real headroom before pushing,
@@ -1136,8 +1136,8 @@ function personaizer_chat_page() {
 
             <?php if ( ! $active ) : ?>
 
-                <?php // An install upgraded from 1.x still holds its persona but no connector: 2.0 syncs as a
-                      // connector, so the site has to be approved once more. Say so, rather than presenting a
+                <?php // An install upgraded from 1.x still holds its persona but no integration: 2.0 syncs as a
+                      // integration, so the site has to be approved once more. Say so, rather than presenting a
                       // site that was working yesterday as one that was never connected. ?>
                 <?php if ( $id !== '' ) : ?>
                 <div class="pz-notice bad">
@@ -1192,7 +1192,7 @@ function personaizer_chat_page() {
                     <div class="pz-hero">
                         <div class="pz-hero-avatar">✦</div>
                         <div class="pz-hero-text">
-                            <h2><?php echo esc_html( $pz_connector['brand']['display_name'] ?: ( $pz_connector['brand']['slug'] ?? 'Your brand' ) ); ?></h2>
+                            <h2><?php echo esc_html( $pz_integration['brand']['display_name'] ?: ( $pz_integration['brand']['slug'] ?? 'Your brand' ) ); ?></h2>
                             <p>Connected — this site keeps your brand&apos;s knowledge up to date. No chat widget is embedded here; reconnect to pick one.</p>
                         </div>
                         <div class="pz-hero-actions">
@@ -1257,7 +1257,7 @@ function personaizer_chat_page() {
                     <?php endif; ?>
                 </div>
 
-                <?php if ( $pz_connector !== null && $pz_connector['status'] === 'disconnected' ) : ?>
+                <?php if ( $pz_integration !== null && $pz_integration['status'] === 'disconnected' ) : ?>
                 <div class="pz-notice bad" style="margin-top:12px;">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e65a5a" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     This site was disconnected on personaizer.com — nothing syncs until you reconnect. Nothing was deleted.
@@ -1271,16 +1271,16 @@ function personaizer_chat_page() {
                     <div class="pz-card">
                         <div class="pz-card-body">
                             <?php
-                            // Read-only here, on purpose. Which lanes sync is the owner's choice on personaizer.com
-                            // (the site's connector page), where every source of the brand sits side by side —
-                            // this screen reports the choice and what each lane holds, and links there to change it.
-                            $pz_lane_states = personaizer_lane_states( $pz_connector );
-                            foreach ( $pz_lane_states as $pz_lane => $pz_state ) {
-                                personaizer_lane_row( $pz_lane, $pz_state );
+                            // Read-only here, on purpose. Which streams sync is the owner's choice on personaizer.com
+                            // (the site's integration page), where every source of the brand sits side by side —
+                            // this screen reports the choice and what each stream holds, and links there to change it.
+                            $pz_stream_states = personaizer_stream_states( $pz_integration );
+                            foreach ( $pz_stream_states as $pz_stream => $pz_state ) {
+                                personaizer_stream_row( $pz_stream, $pz_state );
                             }
                             ?>
                             <p class="pz-signpost" style="margin:10px 0 14px;">
-                                Switch lanes on or off on personaizer.com —
+                                Switch streams on or off on personaizer.com —
                                 <a href="<?php echo esc_url( personaizer_app_url( '/knowledge' ) ); ?>" target="_blank" rel="noopener">manage what your AI uses →</a>
                             </p>
 
@@ -1296,7 +1296,7 @@ function personaizer_chat_page() {
                             // that stays — and it inherits the reassurance the banner was carrying.
                             ?>
                             <?php
-                            // One honest status, from LIVE signals — what the AI actually holds (per-lane
+                            // One honest status, from LIVE signals — what the AI actually holds (per-stream
                             // doc counts) vs the site, plus the overflow queue and the plan's room — never a
                             // stale counter. Five states, never success AND failure at once:
                             //   • running    → progress only
@@ -1311,7 +1311,7 @@ function personaizer_chat_page() {
                             $pz_overflow = personaizer_overflow_count();
 
                             // One live gap, reachable only (a transient API outage must not read as "behind"):
-                            //   switched-on lanes → $pz_synced / $pz_total: the card's "X of Y", and whether the AI
+                            //   switched-on streams → $pz_synced / $pz_total: the card's "X of Y", and whether the AI
                             //                    is genuinely BEHIND the site ($pz_behind). This is the truth —
                             //                    the overflow queue is only bookkeeping and CAN go stale (a
                             //                    deleted item never cleared), so "26 of 26" must never say
@@ -1320,7 +1320,7 @@ function personaizer_chat_page() {
                             // ready = docs the backend has finished processing (embedded → answerable).
                             $pz_ready = 0; $pz_ready_avail = $pz_reachable;
                             if ( $pz_reachable ) {
-                                foreach ( $pz_lane_states as $ls ) {
+                                foreach ( $pz_stream_states as $ls ) {
                                     if ( empty( $ls['enabled'] ) ) continue;
                                     $s = ( $ls['known'] === null ) ? 0 : min( (int) $ls['known'], (int) $ls['count'] );
                                     $pz_total += (int) $ls['count']; $pz_synced += $s;
@@ -1328,7 +1328,7 @@ function personaizer_chat_page() {
                                     else { $pz_ready += min( (int) $ls['ready'], (int) $ls['count'] ); }
                                 }
                             }
-                            $pz_behind  = $pz_reachable && $pz_synced < $pz_total;   // AI missing some items of a switched-on lane
+                            $pz_behind  = $pz_reachable && $pz_synced < $pz_total;   // AI missing some items of a switched-on stream
                             // Uploaded but not yet searchable: the AI HAS these items ($pz_synced) but only
                             // $pz_ready of them have finished processing. This is the honest "still working"
                             // state the flat "Synced — new edits sync automatically" used to paper over.
@@ -1469,7 +1469,7 @@ function personaizer_chat_page() {
                             <?php endif; ?>
 
                             <?php
-                            // Recognition sits in the SAME card as the knowledge lanes, under a divider.
+                            // Recognition sits in the SAME card as the knowledge streams, under a divider.
                             // Both answer one question — "what does it know about this site and the people
                             // on it?" — and a whole card plus a shouty label for one toggle was the page
                             // shouting about its own structure instead of the owner's decisions.
@@ -1554,7 +1554,7 @@ function personaizer_chat_page() {
                 </div>
 
                 <?php
-                // What the last check found, per lane — the manifest's answer from personaizer.com. A doc count
+                // What the last check found, per stream — the manifest's answer from personaizer.com. A doc count
                 // can only ever say how many items exist; this says whether they are RIGHT, which is the question
                 // an owner actually has. Missing and stale items are already queued to push; orphans were removed
                 // there (or held for a second confirming check when there were too many to trust at once).
@@ -1562,12 +1562,12 @@ function personaizer_chat_page() {
                 if ( $pz_check['running'] ) : ?>
                     <div class="pz-sync-state" style="margin-top:8px;">
                         <svg class="pz-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                        Checking<?php if ( $pz_check['lane'] ) : ?> <?php echo esc_html( $pz_lane_states[ $pz_check['lane'] ]['label'] ?? $pz_check['lane'] ); ?> — <?php echo (int) $pz_check['done']; ?> of <?php echo (int) $pz_check['total']; ?><?php endif; ?>… this runs in the background.
+                        Checking<?php if ( $pz_check['stream'] ) : ?> <?php echo esc_html( $pz_stream_states[ $pz_check['stream'] ]['label'] ?? $pz_check['stream'] ); ?> — <?php echo (int) $pz_check['done']; ?> of <?php echo (int) $pz_check['total']; ?><?php endif; ?>… this runs in the background.
                     </div>
                 <?php endif;
-                foreach ( Personaizer_Manifest::results() as $pz_lane => $pz_res ) :
-                    if ( ! isset( $pz_lane_states[ $pz_lane ] ) ) continue;
-                    $pz_label = $pz_lane_states[ $pz_lane ]['label'];
+                foreach ( Personaizer_Manifest::results() as $pz_stream => $pz_res ) :
+                    if ( ! isset( $pz_stream_states[ $pz_stream ] ) ) continue;
+                    $pz_label = $pz_stream_states[ $pz_stream ]['label'];
                     $pz_when  = ! empty( $pz_res['at'] ) ? human_time_diff( (int) $pz_res['at'] ) . ' ago' : '';
                     if ( ! empty( $pz_res['error'] ) ) : ?>
                         <div class="pz-sync-state partial" style="margin-top:8px;">
@@ -1619,8 +1619,8 @@ function personaizer_chat_page() {
             //
             // The actual setTimeout/reload lives in the statically enqueued assets/admin-page.js (see the
             // admin_enqueue_scripts hook above) — this only tells it, via an inline config object, whether
-            // to arm itself. The lane on/off toggle script in that same file needs no such flag; it degrades
-            // to a no-op when the page has no .pz-lane rows.
+            // to arm itself. The stream on/off toggle script in that same file needs no such flag; it degrades
+            // to a no-op when the page has no .pz-stream rows.
             if ( $active && ( ! empty( $profile['building'] ) || $progress['running'] || ! empty( $pz_processing ) || Personaizer_Manifest::progress()['running'] ) ) {
                 wp_add_inline_script(
                     'personaizer-admin-page',
@@ -1635,23 +1635,23 @@ function personaizer_chat_page() {
 }
 
 /**
- * One lane row, read-only: on or off (the owner's switch on personaizer.com), what the AI holds against
+ * One stream row, read-only: on or off (the owner's switch on personaizer.com), what the AI holds against
  * what the site has, and — when the last check found a gap — what it found.
  *
- * @param string $lane  Lane id.
- * @param array  $state From personaizer_lane_states().
+ * @param string $stream  Stream id.
+ * @param array  $state From personaizer_stream_states().
  */
-function personaizer_lane_row( $lane, array $state ) {
+function personaizer_stream_row( $stream, array $state ) {
     ?>
-    <div class="pz-lane<?php echo $state['enabled'] ? '' : ' pz-lane-off'; ?>">
-        <div class="pz-lane-head">
+    <div class="pz-stream<?php echo $state['enabled'] ? '' : ' pz-stream-off'; ?>">
+        <div class="pz-stream-head">
             <span class="pz-switch pz-switch-static" aria-hidden="true">
                 <input type="checkbox" <?php checked( $state['enabled'] ); ?> disabled />
                 <span class="pz-switch-track"><span class="pz-switch-knob"></span></span>
             </span>
-            <span class="pz-lane-name"><?php echo esc_html( $state['label'] ); ?></span>
+            <span class="pz-stream-name"><?php echo esc_html( $state['label'] ); ?></span>
             <?php // What the AI HOLDS, against what the site has. Caught up ⇒ one number. Behind (a gap —
-                  // plan full, or a lane the site moved past) ⇒ "held / total" in amber, so the shortfall
+                  // plan full, or a stream the site moved past) ⇒ "held / total" in amber, so the shortfall
                   // reads at a glance right where someone is looking. "—" only when personaizer.com never
                   // answered — never the site's number, which is the guess this field exists to avoid.
                   $kc_gap = $state['enabled'] && $state['known'] !== null && (int) $state['known'] < (int) $state['count']; ?>
@@ -1665,16 +1665,16 @@ function personaizer_lane_row( $lane, array $state ) {
                 }
             ?></span>
         </div>
-        <div class="pz-lane-sub">
+        <div class="pz-stream-sub">
             <?php if ( ! $state['enabled'] ) : ?>
-                <span class="pz-lane-note"><?php echo $state['offered']
+                <span class="pz-stream-note"><?php echo $state['offered']
                     ? 'Switched off on personaizer.com — your AI keeps what it already learned and ignores it; nothing is deleted.'
                     : 'Not switched on yet — your AI doesn&apos;t use these.'; ?></span>
             <?php elseif ( is_array( $state['reconciliation'] ) ) :
                 $r = $state['reconciliation'];
                 $gap = (int) ( $r['missing'] ?? 0 ) + (int) ( $r['stale'] ?? 0 ) + (int) ( $r['held_orphans'] ?? 0 );
                 if ( $gap > 0 ) : ?>
-                <span class="pz-lane-note">Last check: <?php
+                <span class="pz-stream-note">Last check: <?php
                     $parts = array();
                     if ( (int) ( $r['missing'] ?? 0 ) > 0 ) $parts[] = (int) $r['missing'] . ' missing';
                     if ( (int) ( $r['stale'] ?? 0 ) > 0 ) $parts[] = (int) $r['stale'] . ' out of date';
@@ -1730,12 +1730,12 @@ function personaizer_published_count( $type ) {
 function personaizer_system_info() {
     $id        = get_option( 'personaizer_persona_id', '' );
     $profile   = $id ? personaizer_api()->get_profile() : null;
-    $connector = personaizer_api()->is_configured() ? personaizer_api()->get_connector() : null;
+    $integration = personaizer_api()->is_configured() ? personaizer_api()->get_integration() : null;
 
-    // A live round-trip: proves DNS, TLS, routing and the connector key in one line. Cheap — the connector
+    // A live round-trip: proves DNS, TLS, routing and the integration key in one line. Cheap — the integration
     // call underneath is transient-cached.
-    $reachable = $connector === null ? 'not connected'
-        : ( is_wp_error( $connector ) ? 'NOT reachable — ' . $connector->get_error_message() : 'reachable' );
+    $reachable = $integration === null ? 'not connected'
+        : ( is_wp_error( $integration ) ? 'NOT reachable — ' . $integration->get_error_message() : 'reachable' );
 
     // Version from our own plugin header, so the diagnostic can't quietly lie about which build ran.
     $header = get_file_data( __FILE__, [ 'Version' => 'Version' ] );
@@ -1746,9 +1746,9 @@ function personaizer_system_info() {
     $lines = [
         'PERSONAIZER ' . ( $header['Version'] ?: '?' ),
         '',
-        'Connector  : ' . ( get_option( 'personaizer_connector_id', '' ) ?: 'not connected' )
-            . ( is_array( $connector ) ? '  (' . $connector['status'] . ', brand ' . ( $connector['brand']['slug'] ?: $connector['brand']['id'] ) . ')' : '' ),
-        'Lanes on   : ' . ( is_array( $connector ) ? ( implode( ', ', personaizer_current_lanes() ) ?: 'none' ) : '?' ),
+        'Integration  : ' . ( get_option( 'personaizer_integration_id', '' ) ?: 'not connected' )
+            . ( is_array( $integration ) ? '  (' . $integration['status'] . ', brand ' . ( $integration['brand']['slug'] ?: $integration['brand']['id'] ) . ')' : '' ),
+        'Streams on   : ' . ( is_array( $integration ) ? ( implode( ', ', personaizer_current_streams() ) ?: 'none' ) : '?' ),
         'Widget     : ' . ( $id !== '' ? $id . ( $profile ? '  (' . $profile['name'] . ')' : '' ) : 'no persona' ),
         'API base   : ' . PERSONAIZER_API_URL,
         'API status : ' . $reachable,
@@ -1762,7 +1762,7 @@ function personaizer_system_info() {
  *
  * `public => true` alone is not the line between a site's content and a plugin's furniture. Page builders
  * register their template stores as public because a preview has to render at a front-end URL — Elementor's
- * saved layouts, ElementsKit parts, Royal templates, header/footer builders. Offer those as lanes and an
+ * saved layouts, ElementsKit parts, Royal templates, header/footer builders. Offer those as streams and an
  * Elementor site shows a wall of rows whose contents are shortcodes and layout markup, not answers.
  *
  * Two flags say it for us, and a builder type trips at least one:
@@ -1787,7 +1787,7 @@ function personaizer_extra_post_types() {
         $extra[] = $type;
     }
     /**
-     * Filters the custom post types offered as sync lanes.
+     * Filters the custom post types offered as sync streams.
      *
      * @param WP_Post_Type[] $extra Post type objects, minus pages/posts/products and anything the flags
      *                              above marked as builder machinery.

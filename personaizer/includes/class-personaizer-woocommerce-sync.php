@@ -4,9 +4,9 @@
  *
  * Detection-gated (only wired when WooCommerce is active). Each product maps to a
  * typed knowledge item — price / original price / stock / SKU / attributes / images —
- * pushed into the connector's `products` lane (PUT /v1/connector/lanes/products/docs),
+ * pushed into the integration's `products` stream (PUT /v1/integration/streams/products/docs),
  * so the AI can filter and recommend ("in stock under 50?") rather than read flat text.
- * Pages, posts and custom types are their own lanes (Personaizer_Content_Sync).
+ * Pages, posts and custom types are their own streams (Personaizer_Content_Sync).
  *
  * Mechanism: WooCommerce CRUD hooks (never raw DB / polling).
  *   - woocommerce_update_product / woocommerce_new_product → create/update
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class Personaizer_WooCommerce_Sync {
 
-    const LANE       = 'products';
+    const STREAM       = 'products';
     const MAX_BATCH  = 100;
     const MAX_IMAGES = 15;
 
@@ -30,15 +30,15 @@ class Personaizer_WooCommerce_Sync {
 
         add_action( 'woocommerce_update_product', [ $this, 'on_product_saved' ], 20 );
         add_action( 'woocommerce_new_product', [ $this, 'on_product_saved' ], 20 );
-        add_action( 'woocommerce_product_set_stock', [ $this, 'on_stock_changed' ], 20 );
-        add_action( 'woocommerce_variation_set_stock', [ $this, 'on_variation_stock_changed' ], 20 );
+        add_action( 'woocommerce_product_set_stock', [ $this, 'on_stoik_changed' ], 20 );
+        add_action( 'woocommerce_variation_set_stock', [ $this, 'on_variation_stoik_changed' ], 20 );
         add_action( 'trashed_post', [ $this, 'on_post_removed' ] );
         add_action( 'before_delete_post', [ $this, 'on_post_removed' ] );
     }
 
-    /** The owner switched the Products lane on (on personaizer.com — read from the connector). */
+    /** The owner switched the Products stream on (on personaizer.com — read from the integration). */
     private function enabled() {
-        return in_array( self::LANE, personaizer_current_lanes(), true );
+        return in_array( self::STREAM, personaizer_current_streams(), true );
     }
 
     /** Sync only when enabled, keyed, and WooCommerce's product API is available. */
@@ -60,7 +60,7 @@ class Personaizer_WooCommerce_Sync {
         if ( ! $this->api->is_configured() ) return;
         if ( wp_is_post_revision( $product_id ) ) return;
 
-        // Lane off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the product.
+        // Stream off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the product.
         // An UNPUBLISH does: that walk only visits published products, so it is exactly blind to this, and
         // the doc would outlive the product forever. get_post_status keeps this off wc_get_product, because
         // every purchase in the shop reaches here via the stock hooks.
@@ -84,11 +84,11 @@ class Personaizer_WooCommerce_Sync {
         }
 
         $item   = $this->map_product( $product );
-        $result = $this->api->upsert_products( self::LANE, [ $item ] );
+        $result = $this->api->upsert_products( self::STREAM, [ $item ] );
         if ( is_wp_error( $result ) ) {
-            // The owner shut the lane on personaizer.com (or disconnected): not this product's failure, and
-            // not something to retry on every save. Drop it from the queues; the next connector read decides.
-            if ( Personaizer_Api::is_lane_closed( $result ) ) {
+            // The owner shut the stream on personaizer.com (or disconnected): not this product's failure, and
+            // not something to retry on every save. Drop it from the queues; the next integration read decides.
+            if ( Personaizer_Api::is_stream_closed( $result ) ) {
                 personaizer_forget_overflow( 'products', [ $this->external_id( $product_id ) ] );
                 personaizer_forget_retry( 'products', [ $this->external_id( $product_id ) ] );
                 return;
@@ -116,13 +116,13 @@ class Personaizer_WooCommerce_Sync {
     }
 
     /** Stock changed on a simple product (e.g. a purchase) — re-sync it. */
-    public function on_stock_changed( $product ) {
+    public function on_stoik_changed( $product ) {
         if ( ! ( $product instanceof WC_Product ) ) $product = wc_get_product( $product );
         if ( $product ) $this->on_product_saved( $product->get_id() );
     }
 
     /** Stock changed on a variation — re-sync the parent product it rolls up to. */
-    public function on_variation_stock_changed( $variation ) {
+    public function on_variation_stoik_changed( $variation ) {
         if ( ! ( $variation instanceof WC_Product ) ) $variation = wc_get_product( $variation );
         if ( ! $variation ) return;
         $parent_id = $variation->get_parent_id();
@@ -137,11 +137,11 @@ class Personaizer_WooCommerce_Sync {
         personaizer_forget_overflow( 'products', [ $external_id ] );   // gone ⇒ not waiting
         personaizer_forget_retry( 'products', [ $external_id ] );
 
-        // Queue rather than delete inline, even when the lane is syncing — see personaizer_arm_removal_flush().
+        // Queue rather than delete inline, even when the stream is syncing — see personaizer_arm_removal_flush().
         // An inline call is one blocking round-trip per product, so emptying a category of 200 is 200 of them
         // in a single request; it dies on max_execution_time and every delete it never reached is lost with
         // nothing to retry it. The flush this arms sends them batched, at shutdown, and keeps what it cannot
-        // finish. Deliberately not gated on enabled(): a doc pushed before the lane was switched off still
+        // finish. Deliberately not gated on enabled(): a doc pushed before the stream was switched off still
         // exists, so a deletion while it sleeps must still be recorded.
         personaizer_remember_removal( 'products', $external_id, $post_id );
     }
@@ -149,7 +149,7 @@ class Personaizer_WooCommerce_Sync {
     /**
      * The exact item this product would be pushed as — no request, no side effects.
      *
-     * The lane manifest fingerprints THIS, not the WooCommerce row, so the comparison is against what the
+     * The stream manifest fingerprints THIS, not the WooCommerce row, so the comparison is against what the
      * AI actually received. That is what lets a change in the mapper itself (a bug fix that starts emitting
      * a previously-dropped attribute) register as "out of date" rather than staying invisible.
      */
@@ -159,7 +159,7 @@ class Personaizer_WooCommerce_Sync {
 
     /**
      * Map a WooCommerce product to a typed knowledge item. The item carries its own `fingerprint` (the hash
-     * of everything else in it), which the backend stores and the lane manifest compares.
+     * of everything else in it), which the backend stores and the stream manifest compares.
      */
     private function map_product( WC_Product $product ) {
         $id    = $product->get_id();
@@ -295,8 +295,8 @@ class Personaizer_WooCommerce_Sync {
         // NOTE: the WooCommerce product `type` (simple/variable/…) is deliberately NOT synced — it's a
         // storefront implementation detail (how the store models the product), not a product attribute a
         // shopper or the AI ever filters on. Whether a product varies is expressed by its `variants`.
-        // Exact stock_quantity is deliberately NOT synced as an attribute: it's volatile
-        // (changes on every purchase) and a normal attribute rides the backend's embed lane,
+        // Exact stoik_quantity is deliberately NOT synced as an attribute: it's volatile
+        // (changes on every purchase) and a normal attribute rides the backend's embed stream,
         // so syncing it would force a re-embed on every stock change. Availability instead
         // comes from the typed `in_stock` boolean, which the backend treats as a commerce
         // mirror EXCLUDED from embedding — so stock churn is a cheap column write, never a re-embed.
@@ -305,7 +305,7 @@ class Personaizer_WooCommerce_Sync {
         foreach ( $product->get_attributes() as $name => $attribute ) {
             if ( is_a( $attribute, 'WC_Product_Attribute' ) ) {
                 // Variation axes (Color/Size on a variable product) are carried PER-SKU in `variants`,
-                // never as doc attributes — that keeps volatile per-SKU facets out of the embed lane.
+                // never as doc attributes — that keeps volatile per-SKU facets out of the embed stream.
                 if ( $attribute->get_variation() ) continue;
                 // On a SIMPLE product its global (taxonomy `pa_*`) attributes are the same axes that
                 // are variations on variable products — carry them per-SKU too (simple_variant()), so
@@ -553,10 +553,10 @@ class Personaizer_WooCommerce_Sync {
      * @return int items pushed (0 on failure — a failed batch must not count as synced).
      */
     private function push( array $batch, array $post_ids = array() ) {
-        $res = $this->api->upsert_products( self::LANE, $batch );
+        $res = $this->api->upsert_products( self::STREAM, $batch );
         if ( is_wp_error( $res ) ) {
-            // The lane is shut on personaizer.com — nothing in this batch is owed a retry.
-            if ( Personaizer_Api::is_lane_closed( $res ) ) {
+            // The stream is shut on personaizer.com — nothing in this batch is owed a retry.
+            if ( Personaizer_Api::is_stream_closed( $res ) ) {
                 $exts = array();
                 foreach ( $post_ids as $pid ) $exts[] = $this->external_id( $pid );
                 personaizer_forget_overflow( 'products', $exts );
@@ -619,15 +619,15 @@ class Personaizer_WooCommerce_Sync {
             $pid = isset( $post_ids[ $i ] ) ? (int) $post_ids[ $i ] : 0;
             $ext = $pid ? $this->external_id( $pid ) : ( isset( $item['id'] ) ? $item['id'] : '' );
 
-            $res = $this->api->upsert_products( self::LANE, array( $item ) );
+            $res = $this->api->upsert_products( self::STREAM, array( $item ) );
 
             if ( is_wp_error( $res ) ) {
-                if ( Personaizer_Api::is_lane_closed( $res ) ) {
+                if ( Personaizer_Api::is_stream_closed( $res ) ) {
                     if ( $ext !== '' ) {
                         personaizer_forget_overflow( 'products', array( $ext ) );
                         personaizer_forget_retry( 'products', array( $ext ) );
                     }
-                    return $landed;   // the lane is shut for every item that follows too
+                    return $landed;   // the stream is shut for every item that follows too
                 }
                 // Quota is not brokenness — it belongs in the overflow queue, which replays after an
                 // upgrade. Everything else goes to the retry queue, which replays unconditionally.

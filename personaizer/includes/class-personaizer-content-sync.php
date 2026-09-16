@@ -1,17 +1,17 @@
 <?php
 /**
- * General WordPress content sync → the site's connector lanes on PERSONAIZER.
+ * General WordPress content sync → the site's integration streams on PERSONAIZER.
  *
- * Pushes posts / pages / public custom post types into their lane (one lane per post type; the backend
- * files each lane into its own source). Products (WooCommerce) are handled separately by the typed catalog
+ * Pushes posts / pages / public custom post types into their stream (one stream per post type; the backend
+ * files each stream into its own source). Products (WooCommerce) are handled separately by the typed catalog
  * mapper.
  *
  * Mechanism: WordPress hooks (never raw DB / polling).
  *   - wp_after_insert_post  → create/update  (fires AFTER meta+terms are saved,
  *                             unlike raw save_post which fires before)
- *   - trashed_post / before_delete_post → remove; or, when the lane is off,
+ *   - trashed_post / before_delete_post → remove; or, when the stream is off,
  *                             remember it for the resume (see remember_removal)
- *   - the daily tick (Personaizer_Manifest) → the lane manifest catches whatever the hooks missed
+ *   - the daily tick (Personaizer_Manifest) → the stream manifest catches whatever the hooks missed
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -29,12 +29,12 @@ class Personaizer_Content_Sync {
         add_action( 'before_delete_post', [ $this, 'on_post_removed' ] );
     }
 
-    /** Post types whose lane the owner switched on (read from the connector, never from a local option). */
+    /** Post types whose stream the owner switched on (read from the integration, never from a local option). */
     private function enabled_types() {
         $types = array();
-        $lanes = personaizer_lanes();
-        foreach ( personaizer_current_lanes() as $lane ) {
-            if ( $lane !== 'products' && isset( $lanes[ $lane ] ) ) $types[] = $lanes[ $lane ]['post_type'];
+        $streams = personaizer_streams();
+        foreach ( personaizer_current_streams() as $stream ) {
+            if ( $stream !== 'products' && isset( $streams[ $stream ] ) ) $types[] = $streams[ $stream ]['post_type'];
         }
         return $types;
     }
@@ -57,7 +57,7 @@ class Personaizer_Content_Sync {
         if ( ! $post ) return;
 
         if ( ! in_array( $post->post_type, $this->enabled_types(), true ) ) {
-            // Lane off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the post
+            // Stream off. An EDIT needs nothing remembered — the catch-up walk on resume re-reads the post
             // as it stands then. An UNPUBLISH does: that walk only visits published posts, so it is exactly
             // blind to this, and the doc would outlive the page forever.
             if ( $post->post_status !== 'publish' ) {
@@ -80,7 +80,7 @@ class Personaizer_Content_Sync {
         if ( ! $post ) return;
         $this->forget( $post );
         // Always queued, never sent inline — see personaizer_arm_removal_flush() for why bulk deletes
-        // make a per-post API call unsafe. A lane that is off took this path already; now every removal does.
+        // make a per-post API call unsafe. A stream that is off took this path already; now every removal does.
         $this->remember_removal( $post );
     }
 
@@ -90,47 +90,47 @@ class Personaizer_Content_Sync {
      * never be re-pushed to clear itself (it no longer exists).
      */
     private function forget( WP_Post $post ) {
-        $lane = personaizer_lane_for_post_type( $post->post_type );
-        if ( isset( personaizer_lanes()[ $lane ] ) ) {
-            personaizer_forget_overflow( $lane, [ $this->external_id( $post ) ] );
+        $stream = personaizer_stream_for_post_type( $post->post_type );
+        if ( isset( personaizer_streams()[ $stream ] ) ) {
+            personaizer_forget_overflow( $stream, [ $this->external_id( $post ) ] );
             // Same reasoning as the overflow queue: a post that is gone can never re-push to clear itself,
             // so leaving it queued would retry a deleted item on every tick, forever.
-            personaizer_forget_retry( $lane, [ $this->external_id( $post ) ] );
+            personaizer_forget_retry( $stream, [ $this->external_id( $post ) ] );
         }
     }
 
     /**
      * Queue a removal to be applied by the next flush.
      *
-     * Products are skipped deliberately: they are a lane, but they carry their own id shape
+     * Products are skipped deliberately: they are a stream, but they carry their own id shape
      * (wc-product-99, not wp-product-99) and their own hook, so Personaizer_WooCommerce_Sync queues them.
      * Minting an id here would enqueue a delete for a doc that does not exist and miss the one that does.
      */
     private function remember_removal( WP_Post $post ) {
-        $lane = personaizer_lane_for_post_type( $post->post_type );
-        if ( $lane === 'products' ) return;
-        // A post type we never sync at all (attachments, menu items, a theme's internal types) has no lane
+        $stream = personaizer_stream_for_post_type( $post->post_type );
+        if ( $stream === 'products' ) return;
+        // A post type we never sync at all (attachments, menu items, a theme's internal types) has no stream
         // and no doc — nothing to remember.
-        if ( ! isset( personaizer_lanes()[ $lane ] ) ) return;
-        personaizer_remember_removal( $lane, $this->external_id( $post ), $post->ID );
+        if ( ! isset( personaizer_streams()[ $stream ] ) ) return;
+        personaizer_remember_removal( $stream, $this->external_id( $post ), $post->ID );
     }
 
     /**
      * The exact payload this post would be pushed as — no request, no side effects.
      *
-     * The lane manifest fingerprints THIS rather than the post row, so the comparison is against what the
+     * The stream manifest fingerprints THIS rather than the post row, so the comparison is against what the
      * AI actually received: rendered content (shortcodes and blocks expanded, tags stripped) and the
      * resolved image URLs. A theme or plugin that changes how content renders therefore shows up as
      * "out of date", which reading post_modified alone would never reveal.
      *
-     * @return array|null Null for a post type with no lane (nothing would be sent).
+     * @return array|null Null for a post type with no stream (nothing would be sent).
      */
     public function payload_for( WP_Post $post ) {
-        $lane = personaizer_lane_for_post_type( $post->post_type );
-        if ( ! isset( personaizer_lanes()[ $lane ] ) ) return null;
+        $stream = personaizer_stream_for_post_type( $post->post_type );
+        if ( ! isset( personaizer_streams()[ $stream ] ) ) return null;
         return array(
             'id'        => $this->external_id( $post ),
-            'lane'      => $lane,
+            'stream'      => $stream,
             'title'     => $this->post_title( $post ),
             'markdown'  => $this->render_content( $post ),
             'permalink' => get_permalink( $post ),
@@ -144,10 +144,10 @@ class Personaizer_Content_Sync {
         if ( $payload === null ) {
             return false;
         }
-        $lane   = $payload['lane'];
+        $stream   = $payload['stream'];
         $ext    = $payload['id'];
         $result = $this->api->upsert_text(
-            $lane,
+            $stream,
             $ext,
             $payload['title'],
             $payload['markdown'],
@@ -157,11 +157,11 @@ class Personaizer_Content_Sync {
         );
 
         if ( is_wp_error( $result ) ) {
-            if ( Personaizer_Api::is_lane_closed( $result ) ) {
-                // The owner shut this lane on personaizer.com (or disconnected). Not a failure of this post:
+            if ( Personaizer_Api::is_stream_closed( $result ) ) {
+                // The owner shut this stream on personaizer.com (or disconnected). Not a failure of this post:
                 // drop it from every queue rather than retry a closed door on each edit.
-                personaizer_forget_overflow( $lane, array( $ext ) );
-                personaizer_forget_retry( $lane, array( $ext ) );
+                personaizer_forget_overflow( $stream, array( $ext ) );
+                personaizer_forget_retry( $stream, array( $ext ) );
                 return false;
             }
             // The plan being full isn't "this post is broken" — remember it so the after-upgrade catch-up
@@ -170,16 +170,16 @@ class Personaizer_Content_Sync {
             // permanently reading "4 of 5 pages" with no way back short of a manual Resync. Queued here, it
             // is re-tried on every catch-up tick until it lands.
             if ( Personaizer_Api::is_quota_error( $result ) ) {
-                personaizer_remember_overflow( $lane, $ext, $post->ID );
+                personaizer_remember_overflow( $stream, $ext, $post->ID );
             } else {
-                personaizer_remember_retry( $lane, $ext, $post->ID );
+                personaizer_remember_retry( $stream, $ext, $post->ID );
             }
             personaizer_debug_log( 'content sync failed for post ' . $post->ID . ': ' . $result->get_error_message() );
             return false;
         }
         // Landed — if it had been waiting for plan space or a retry, it isn't anymore.
-        personaizer_forget_overflow( $lane, array( $ext ) );
-        personaizer_forget_retry( $lane, array( $ext ) );
+        personaizer_forget_overflow( $stream, array( $ext ) );
+        personaizer_forget_retry( $stream, array( $ext ) );
         return true;
     }
 

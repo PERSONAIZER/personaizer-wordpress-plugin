@@ -33,7 +33,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Dev API base — the single /v1 ingress (deploy/sessions/dev/ingress-v1.yaml) that path-routes BOTH
-// Core (/v1/persona, /v1/connector, /api/integrations/connect, /api/subscription/limits) AND Sessions
+// Core (/v1/persona, /v1/integration, /api/integrations/connect, /api/subscription/limits) AND Sessions
 // (/v1/chat). The plugin only knows ONE host, so both the content sync AND the widget's chat ride this.
 define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );
 

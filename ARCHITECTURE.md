@@ -7,13 +7,13 @@ How this plugin is put together, for anyone picking it up cold.
 ```
 personaizer.php                          bootstrap, admin menu + settings page, widget injection
 includes/
-  class-personaizer-api.php                    HTTP client for the PERSONAIZER connector API (ck_ key)
+  class-personaizer-api.php                    HTTP client for the PERSONAIZER integration API (ik_ key)
   class-personaizer-site-profile.php           describes this WordPress site to PERSONAIZER (no scraping needed)
   class-personaizer-daily.php                  the one recurring WP-Cron tick everything hands-off rides
-  class-personaizer-content-sync.php           Pages/Posts/CPTs → their lanes, via WP hooks
-  class-personaizer-woocommerce-sync.php       WooCommerce Products → the products lane, via WC hooks
+  class-personaizer-content-sync.php           Pages/Posts/CPTs → their streams, via WP hooks
+  class-personaizer-woocommerce-sync.php       WooCommerce Products → the products stream, via WC hooks
   class-personaizer-backfill.php               one-time "sync everything that already exists" (WP-Cron)
-  class-personaizer-manifest.php               the lane manifest: proves each lane 1:1 with the site (WP-Cron)
+  class-personaizer-manifest.php               the stream manifest: proves each stream 1:1 with the site (WP-Cron)
   class-personaizer-updater.php                self-hosted "update available" channel (zip distribution only)
   class-personaizer-data.php                   single source of truth for "what did we store", for
                                                 Disconnect + uninstall.php
@@ -28,11 +28,11 @@ assets/admin-page.{css,js}                     the settings page's styling + JS,
 The backend (`api.personaizer.com`) accepts two different credentials, and this plugin uses both,
 deliberately, for different calls:
 
-1. **Connector key — `X-Api-Key: ck_…`.** Server-side only, read via `Personaizer_Api::connector_key()`
+1. **Integration key — `X-Api-Key: ik_…`.** Server-side only, read via `Personaizer_Api::integration_key()`
    (`includes/class-personaizer-api.php`) from the option the plugin stores after Connect. It is the
-   credential of this site's *connector* on personaizer.com — the thing that owns the knowledge lanes the
-   site syncs — and reaches only `/v1/connector/*`: reading the connector (which lanes are on), reporting
-   inventory, pushing/deleting docs in a lane, sending a lane manifest, and checking subscription limits.
+   credential of this site's *integration* on personaizer.com — the thing that owns the knowledge streams the
+   site syncs — and reaches only `/v1/integration/*`: reading the integration (which streams are on), reporting
+   inventory, pushing/deleting docs in a stream, sending a stream manifest, and checking subscription limits.
    This key must never reach the browser. Every call also sends `X-Personaizer-Plugin-Version`.
 
 2. **Public Persona ID — `X-Persona-Id: <GUID>`.** Safe to print into the page (it's the Intercom
@@ -44,13 +44,13 @@ deliberately, for different calls:
 Only ONE anonymous, unauthenticated call exists: `GET /v1/persona/profile`, used by the admin settings
 page to show the connected persona's name/avatar.
 
-## Which lanes sync is not a plugin setting
+## Which streams sync is not a plugin setting
 
-The owner switches lanes on and off on personaizer.com (the connector's page, beside every other source of
-the brand). The plugin reads that back from `GET /v1/connector` — cached a minute, refreshed after anything
+The owner switches streams on and off on personaizer.com (the integration's page, beside every other source of
+the brand). The plugin reads that back from `GET /v1/integration` — cached a minute, refreshed after anything
 that could change it, and backed by the last good answer when the API is unreachable — and pushes only
-into lanes that are on. A push into a lane that was switched off answers `409 connector.lane_disabled`,
-which the sync layer treats as "drop it, don't retry". Nothing about lanes is stored locally as truth.
+into streams that are on. A push into a stream that was switched off answers `409 integration.stream_disabled`,
+which the sync layer treats as "drop it, don't retry". Nothing about streams is stored locally as truth.
 
 ## Content sync: three independent mechanisms, not one
 
@@ -64,17 +64,17 @@ which the sync layer treats as "drop it, don't retry". Nothing about lanes is st
 - **`Personaizer_Manifest`** exists because an event-driven design can silently drift — a missed WP-Cron
   tick, a timeout, a product trashed while the plugin was inactive — and "we attempted a send" is not the
   same claim as "the AI actually holds this." Daily (and after a backfill, and on demand) it walks each
-  lane that is on, fingerprints every published item (the hash of the exact payload it would push — the
-  same hash sent with every push), and hands the list to `PUT /v1/connector/lanes/{lane}/manifest`. The
+  stream that is on, fingerprints every published item (the hash of the exact payload it would push — the
+  same hash sent with every push), and hands the list to `PUT /v1/integration/streams/{stream}/manifest`. The
   backend answers what it is missing or holds stale (queued for the retry tick to push) and removes what
   the site no longer lists — behind rails of its own: a manifest that would orphan more than a quarter of a
-  lane is held until the next one agrees. On this side a lane's manifest is sent only when the site can
+  stream is held until the next one agrees. On this side a stream's manifest is sent only when the site can
   enumerate it fully right now (a post type that isn't registered — WooCommerce deactivated — is skipped,
   never reported empty).
 
-Each lane (Pages, Posts, each public CPT, Products) is switched on/off independently on personaizer.com.
-Turning a lane off doesn't delete anything already synced; removals made while off are queued and
-re-verified once the lane resumes.
+Each stream (Pages, Posts, each public CPT, Products) is switched on/off independently on personaizer.com.
+Turning a stream off doesn't delete anything already synced; removals made while off are queued and
+re-verified once the stream resumes.
 
 ## Distribution: two update channels, mutually exclusive per build
 
