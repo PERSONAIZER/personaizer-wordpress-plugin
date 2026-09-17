@@ -124,12 +124,17 @@ function personaizer_app_url( $path = '' ) {
  * personaizer.com (the backend files each stream into its own source — `<host>-<stream>` — so "stop using my
  * products, keep my pages" is a thing the owner can express, without deleting anything).
  *
- * @return array<string,array{label:string,post_type:string}> keyed by stream id.
+ * Each stream also declares what a source of it HOLDS on personaizer.com: 'catalog' for typed entries with
+ * attributes, variants and price (WooCommerce products), 'files' for a record uploaded as a text document
+ * (pages, posts, any custom type). The backend files the stream by what this says, never by the stream's
+ * name, and refuses to switch on a stream that declares nothing.
+ *
+ * @return array<string,array{label:string,post_type:string,type:string}> keyed by stream id.
  */
 function personaizer_streams() {
     $streams = array(
-        'pages' => array( 'label' => 'Pages', 'post_type' => 'page' ),
-        'posts' => array( 'label' => 'Posts', 'post_type' => 'post' ),
+        'pages' => array( 'label' => 'Pages', 'post_type' => 'page', 'type' => 'files' ),
+        'posts' => array( 'label' => 'Posts', 'post_type' => 'post', 'type' => 'files' ),
     );
     // A custom type is just another stream — same source shape, same controls. Nothing about this is special
     // cased, which is the point: a site with a Recipes type gets Recipes beside Pages, and the ~95% without
@@ -154,10 +159,13 @@ function personaizer_streams() {
         $streams[ $type->name ] = array(
             'label'     => $seen[ $label ] > 1 ? $label . ' (' . $type->name . ')' : $label,
             'post_type' => $type->name,
+            // A custom type is WordPress content: each record is pushed as a text document, like a page or a post.
+            'type'      => 'files',
         );
     }
     if ( class_exists( 'WooCommerce' ) ) {
-        $streams['products'] = array( 'label' => 'Products', 'post_type' => 'product' );
+        // The only catalog stream: a product is pushed as a typed entry with its attributes, variants and price.
+        $streams['products'] = array( 'label' => 'Products', 'post_type' => 'product', 'type' => 'catalog' );
     }
     return $streams;
 }
@@ -820,7 +828,12 @@ function personaizer_b64url( $bin ) {
 function personaizer_inventory() {
     $out = array();
     foreach ( personaizer_streams() as $stream => $meta ) {
-        $out[] = array( 'stream' => $stream, 'label' => $meta['label'], 'count' => personaizer_published_count( $meta['post_type'] ) );
+        $out[] = array(
+            'stream' => $stream,
+            'label'  => $meta['label'],
+            'count'  => personaizer_published_count( $meta['post_type'] ),
+            'type'   => $meta['type'],
+        );
     }
     return $out;
 }
