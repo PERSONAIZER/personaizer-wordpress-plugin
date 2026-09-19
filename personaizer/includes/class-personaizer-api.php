@@ -124,7 +124,7 @@ class Personaizer_Api {
      * outright by forget_integration() after anything that changes it.
      *
      * @param bool $force Skip the cache and read live.
-     * @return array{id:string,status:string,brand:array{id:string,slug:string,display_name:string},streams:array<string,array{enabled:bool,source:string,doc_count:int,ready_count:int,reconciliation:?array}>}|WP_Error
+     * @return array{id:string,status:string,brand:array{id:string,display_name:string},streams:array<string,array{enabled:bool,source:string,doc_count:int,ready_count:int,reconciliation:?array}>}|WP_Error
      */
     public function get_integration( $force = false ) {
         $key = $this->integration_key();
@@ -169,7 +169,6 @@ class Personaizer_Api {
             'status' => (string) ( $integration['status'] ?? '' ),
             'brand'  => array(
                 'id'           => (string) ( $brand['id'] ?? '' ),
-                'slug'         => (string) ( $brand['slug'] ?? '' ),
                 'display_name' => (string) ( $brand['display_name'] ?? '' ),
             ),
             'streams'  => $streams,

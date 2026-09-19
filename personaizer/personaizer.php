@@ -1205,7 +1205,7 @@ function personaizer_chat_page() {
                     <div class="pz-hero">
                         <div class="pz-hero-avatar">✦</div>
                         <div class="pz-hero-text">
-                            <h2><?php echo esc_html( $pz_integration['brand']['display_name'] ?: ( $pz_integration['brand']['slug'] ?? 'Your brand' ) ); ?></h2>
+                            <h2><?php echo esc_html( $pz_integration['brand']['display_name'] ?: 'Your brand' ); ?></h2>
                             <p>Connected — this site keeps your brand&apos;s knowledge up to date. No chat widget is embedded here; reconnect to pick one.</p>
                         </div>
                         <div class="pz-hero-actions">
@@ -1760,7 +1760,7 @@ function personaizer_system_info() {
         'PERSONAIZER ' . ( $header['Version'] ?: '?' ),
         '',
         'Integration  : ' . ( get_option( 'personaizer_integration_id', '' ) ?: 'not connected' )
-            . ( is_array( $integration ) ? '  (' . $integration['status'] . ', brand ' . ( $integration['brand']['slug'] ?: $integration['brand']['id'] ) . ')' : '' ),
+            . ( is_array( $integration ) ? '  (' . $integration['status'] . ', brand ' . ( $integration['brand']['display_name'] ?: $integration['brand']['id'] ) . ')' : '' ),
         'Streams on   : ' . ( is_array( $integration ) ? ( implode( ', ', personaizer_current_streams() ) ?: 'none' ) : '?' ),
         'Widget     : ' . ( $id !== '' ? $id . ( $profile ? '  (' . $profile['name'] . ')' : '' ) : 'no persona' ),
         'API base   : ' . PERSONAIZER_API_URL,
