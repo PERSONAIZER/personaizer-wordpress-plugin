@@ -15,7 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 final class PostPayload {
 
-    const MAX_IMAGES = 20;
+    /** The API holds at most this many per document (Knowledge:Acceptor:MaxLibraryEntries) and refuses a longer list. */
+    const MAX_IMAGES = 15;
 
     /** `wp-<post_type>-<ID>` — the site's stable record id. */
     public static function external_id( WP_Post $post ) {
@@ -51,8 +52,8 @@ final class PostPayload {
     }
 
     /**
-     * The featured image (primary) plus inline <img> in the rendered content — absolute http(s) URLs only, capped
-     * so an image-heavy post can't flood the library (the API caps again). The first image is the primary: the
+     * The featured image (primary) plus inline <img> in the rendered content — absolute http(s) URLs only, cut at
+     * the API's per-document cap (a longer list is refused, not trimmed). The first image is the primary: the
      * featured image when there is one, else the first inline image.
      *
      * Descriptions: PERSONAIZER runs vision on the PRIMARY image only when it arrives without a description, and folds
