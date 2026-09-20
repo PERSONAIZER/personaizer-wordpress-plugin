@@ -1,0 +1,50 @@
+{
+  "request": {
+    "upserts": [
+      {
+        "id": "wp-page-2",
+        "fingerprint": "3c59dc048e8850243be8079a5c74d079",
+        "title": "About us",
+        "content": "# About us\n\nWe knit merino in Tbilisi since 2014.",
+        "links": [
+          {
+            "url": "https://shop.example.com/about/",
+            "is_primary": true
+          }
+        ],
+        "images": [
+          {
+            "url": "https://shop.example.com/wp-content/uploads/team.jpg",
+            "description": "Our team",
+            "is_primary": true
+          }
+        ]
+      },
+      {
+        "id": "wp-page-3",
+        "fingerprint": "d41d8cd98f00b204e9800998ecf8427e",
+        "title": "Not a page",
+        "price": 5
+      }
+    ],
+    "deletes": [
+      "wp-page-7"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "written": [
+      "wp-page-2"
+    ],
+    "deferred": [],
+    "rejected": [
+      {
+        "id": "wp-page-3",
+        "code": "knowledge.source_type_mismatch",
+        "message": "This stream holds files: send content, not catalog fields."
+      }
+    ],
+    "deleted": 0,
+    "deletes_busy": false
+  }
+}

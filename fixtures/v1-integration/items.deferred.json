@@ -1,0 +1,22 @@
+{
+  "request": {
+    "upserts": [
+      {
+        "id": "wp-page-4",
+        "fingerprint": "a",
+        "title": "Delivery",
+        "content": "# Delivery\n\nTwo days."
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "written": [],
+    "deferred": [
+      "wp-page-4"
+    ],
+    "rejected": [],
+    "deleted": 0,
+    "deletes_busy": false
+  }
+}

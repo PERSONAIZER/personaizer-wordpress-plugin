@@ -77,9 +77,9 @@ check_default() {  # <file> <constant> <expected>
     grep -q "define( '$2', '$3' );" "$SRC_DIR/$1" \
         || { echo "error: $2 does not default to $3 — refusing to package" >&2; exit 1; }
 }
-check_default "$SLUG.php"            PERSONAIZER_WIDGET_URL 'https://personaizerprodstore.blob.core.windows.net/platform-builds-public/chat.js'
-check_default "$SLUG.php"            PERSONAIZER_APP_URL    'https://personaizer.com'
-check_default includes/class-personaizer-api.php PERSONAIZER_API_URL 'https://api.personaizer.com'
+check_default "$SLUG.php" PERSONAIZER_WIDGET_URL 'https://personaizerprodstore.blob.core.windows.net/platform-builds-public/chat.js'
+check_default "$SLUG.php" PERSONAIZER_APP_URL 'https://personaizer.com'
+check_default "$SLUG.php" PERSONAIZER_API_URL 'https://api.personaizer.com'
 echo "✓ source defaults point at production"
 
 # ── Stage ─────────────────────────────────────────────────────────────────────
@@ -97,17 +97,17 @@ if [ "$ENV" = "dev" ]; then
     dp="$STAGE/$SLUG"
     sed -i "s|personaizerprodstore.blob.core.windows.net|personaizerdevstore2.blob.core.windows.net|g" "$dp/$SLUG.php"
     sed -i "s|define( 'PERSONAIZER_APP_URL', 'https://personaizer.com' );|define( 'PERSONAIZER_APP_URL', 'https://dev.personaizer.com' );|" "$dp/$SLUG.php"
-    sed -i "s|define( 'PERSONAIZER_API_URL', 'https://api.personaizer.com' );|define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );|" "$dp/includes/class-personaizer-api.php"
+    sed -i "s|define( 'PERSONAIZER_API_URL', 'https://api.personaizer.com' );|define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );|" "$dp/$SLUG.php"
     # Assert the rewrite actually landed — if a constant was renamed the sed silently no-ops, and a
     # "dev" build that still pointed at prod would be a maddening thing to debug on a test site.
-    grep -q "define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );" "$dp/includes/class-personaizer-api.php" \
+    grep -q "define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );" "$dp/$SLUG.php" \
         || { echo "error: dev rewrite of PERSONAIZER_API_URL failed — did the define change?" >&2; exit 1; }
     grep -q "define( 'PERSONAIZER_APP_URL', 'https://dev.personaizer.com' );" "$dp/$SLUG.php" \
         || { echo "error: dev rewrite of PERSONAIZER_APP_URL failed — did the define change?" >&2; exit 1; }
     # Drop the updater. There is one release line now (GitHub Releases), so a dev build that kept it
     # would poll that line and offer the tester a PROD package — quietly replacing the dev URLs they
     # installed it for. A hand-installed test artifact has no business auto-updating; rebuild instead.
-    rm -f "$dp/includes/class-personaizer-updater.php"
+    rm -f "$dp/src/Updater.php"
     echo "✓ dev build — rewrote API→dev-api.personaizer.com, dashboard→dev.personaizer.com, widget→dev blob; updater removed"
 fi
 
@@ -118,8 +118,8 @@ fi
 # survived in what actually ships.
 if [ "$ENV" = "org" ]; then
     dp="$STAGE/$SLUG"
-    rm -f "$dp/includes/class-personaizer-updater.php"
-    [ ! -f "$dp/includes/class-personaizer-updater.php" ] \
+    rm -f "$dp/src/Updater.php"
+    [ ! -f "$dp/src/Updater.php" ] \
         || { echo "error: could not drop the updater from the org build" >&2; exit 1; }
     if grep -rEq 'pre_set_site_transient_update_plugins|PERSONAIZER_UPDATE_MANIFEST_URL' "$dp"; then
         echo "error: org build still carries self-hosted update code — wordpress.org would reject it:" >&2

@@ -1,0 +1,15 @@
+{
+  "request": null,
+  "status": 409,
+  "response": {
+    "type": "https://www.personaizer.com/developers/guides#error-integration.reconcile_stale_generation",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "Generation 12 is not newer than the last applied (12).",
+    "code": "integration.reconcile_stale_generation",
+    "errors": [
+      "Generation 12 is not newer than the last applied (12)."
+    ],
+    "traceId": "<trace_id>"
+  }
+}

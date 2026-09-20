@@ -1,0 +1,26 @@
+{
+  "request": {
+    "generation": 12,
+    "items": [
+      {
+        "id": "wc-product-88",
+        "fingerprint": "9f86d081884c7d659a2feaa0c55ad015"
+      },
+      {
+        "id": "wc-product-90",
+        "fingerprint": "0cc175b9c0f1b6a831c399e269772661"
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "generation": 12,
+    "missing": [
+      "wc-product-90"
+    ],
+    "stale": [],
+    "orphans_deleted": 0,
+    "orphans_held": 0,
+    "busy": false
+  }
+}

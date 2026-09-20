@@ -1,0 +1,47 @@
+{
+  "request": {
+    "platform": "wordpress",
+    "site_origin": "https://shop.example.com",
+    "site_name": "Example Shop",
+    "redirect_uri": "https://shop.example.com/wp-admin/admin-post.php?action=personaizer_connect_callback",
+    "code_challenge": "<pkce>",
+    "site_profile": {
+      "brand_name": "Example Shop",
+      "audience_languages": [
+        "ka",
+        "en"
+      ],
+      "logo_url": "https://shop.example.com/logo.png",
+      "accent_colors": [
+        "#112233"
+      ],
+      "currency": "GEL",
+      "description": "Knitwear from Tbilisi",
+      "homepage_markdown": "# Example Shop"
+    },
+    "inventory": [
+      {
+        "stream_key": "pages",
+        "label": "Pages",
+        "count": 12,
+        "type": "files"
+      },
+      {
+        "stream_key": "posts",
+        "label": "Posts",
+        "count": 3,
+        "type": "files"
+      },
+      {
+        "stream_key": "products",
+        "label": "Products",
+        "count": 40,
+        "type": "catalog"
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "connect_id": "<guid>"
+  }
+}

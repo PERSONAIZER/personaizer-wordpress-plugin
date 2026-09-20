@@ -1,0 +1,92 @@
+{
+  "request": {
+    "upserts": [
+      {
+        "id": "wc-product-88",
+        "fingerprint": "9f86d081884c7d659a2feaa0c55ad015",
+        "title": "Merino Wool Sweater",
+        "description": "Lightweight merino, knitted in Tbilisi.",
+        "categories": [
+          [
+            "Clothing",
+            "Knitwear"
+          ],
+          [
+            "Sale"
+          ]
+        ],
+        "currency": "GEL",
+        "attributes": {
+          "sku": "MW-SW-001",
+          "material": "merino",
+          "category": [
+            "Clothing",
+            "Knitwear",
+            "Sale"
+          ]
+        },
+        "images": [
+          {
+            "url": "https://shop.example.com/wp-content/uploads/sweater.jpg",
+            "description": "",
+            "is_primary": true
+          }
+        ],
+        "links": [
+          {
+            "url": "https://shop.example.com/product/merino-wool-sweater/",
+            "is_primary": true
+          }
+        ],
+        "variants": [
+          {
+            "sku": "MW-SW-001-M-BLUE",
+            "price": 129.00,
+            "original_price": 159.00,
+            "in_stock": true,
+            "size": [
+              "M"
+            ],
+            "color": [
+              "Blue"
+            ]
+          },
+          {
+            "sku": "MW-SW-001-L-BLUE",
+            "price": 129.00,
+            "in_stock": false,
+            "size": [
+              "L"
+            ],
+            "color": [
+              "Blue"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "wc-product-89",
+        "fingerprint": "e2c569be17396eca2a2e3c11578123ed",
+        "title": "A page in disguise",
+        "content": "# Not a product"
+      }
+    ],
+    "deletes": []
+  },
+  "status": 200,
+  "response": {
+    "written": [
+      "wc-product-88"
+    ],
+    "deferred": [],
+    "rejected": [
+      {
+        "id": "wc-product-89",
+        "code": "knowledge.source_type_mismatch",
+        "message": "This stream holds a catalog: send typed fields, not content."
+      }
+    ],
+    "deleted": 0,
+    "deletes_busy": false
+  }
+}

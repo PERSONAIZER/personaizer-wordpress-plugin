@@ -18,11 +18,19 @@ persona automatically — no paid account is needed to try it.
 ## Use it
 
 1. Open the **PERSONAIZER** menu in wp-admin and click **Connect**.
-2. Approve on the PERSONAIZER consent screen — a free persona is created automatically.
-3. The chat widget appears on the site's front end and answers questions.
-4. Optionally turn on content sync (Pages/Posts/WooCommerce Products) so the persona learns your actual
-   site content, and "recognize signed-in customers" if you want the AI to greet logged-in visitors by
-   name.
+2. Approve on the PERSONAIZER consent screen: the brand (the form is filled in from your site), the persona
+   (built for you if you have none), and what to sync — pages, posts, products, custom types, all on by default.
+3. Back in wp-admin the page shows the persona building and each stream syncing; the chat widget appears on the
+   site's front end as soon as the persona is ready.
+4. Optionally "recognise signed-in customers" so the AI greets logged-in visitors by name.
+
+## Develop
+
+```bash
+tools/sync-fixtures.sh          # copy the backend's recorded API exchanges into fixtures/
+php tools/phpunit.phar          # unit tests, no WordPress needed (curl -L -o tools/phpunit.phar https://phar.phpunit.de/phpunit-11.phar)
+./build-zip.sh --dev            # a zip that talks to dev-api.personaizer.com → dist/
+```
 
 Everything the owner configures beyond that — the widget's look, greeting, FAQ, and the persona itself —
 lives on [personaizer.com](https://personaizer.com); this plugin is the bridge to it, not a second copy of

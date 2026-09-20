@@ -2,114 +2,102 @@
 
 How this plugin is put together, for anyone picking it up cold.
 
+## In one paragraph
+
+The site's pages, posts, products and public custom types are **streams**. Every change on the site drops a row
+into an **outbox** table; one **worker** drains the outbox to PERSONAIZER in batches, after asking once a minute
+which streams the owner has switched on. Once a day each stream's **full list** is reconciled so nothing drifts.
+The connection is made once from the admin page; the chat widget rides on every page. Everything the owner
+configures lives on personaizer.com — this plugin has one setting of its own (recognise signed-in customers).
+
 ## File map
 
 ```
-personaizer.php                          bootstrap, admin menu + settings page, widget injection
-includes/
-  class-personaizer-api.php                    HTTP client for the PERSONAIZER integration API (ik_ key)
-  class-personaizer-site-profile.php           describes this WordPress site to PERSONAIZER (no scraping needed)
-  class-personaizer-daily.php                  the one recurring WP-Cron tick everything hands-off rides
-  class-personaizer-content-sync.php           Pages/Posts/CPTs → their streams, via WP hooks
-  class-personaizer-woocommerce-sync.php       WooCommerce Products → the products stream, via WC hooks
-  class-personaizer-backfill.php               one-time "sync everything that already exists" (WP-Cron)
-  class-personaizer-manifest.php               the stream manifest: proves each stream 1:1 with the site (WP-Cron)
-  class-personaizer-updater.php                self-hosted "update available" channel (zip distribution only)
-  class-personaizer-data.php                   single source of truth for "what did we store", for
-                                                Disconnect + uninstall.php
-uninstall.php                                  removes every option/credential/scheduled task on delete
-assets/admin-page.{css,js}                     the settings page's styling + JS, registered via
-                                                admin_enqueue_scripts (not raw <style>/<script> echoes —
-                                                WordPress.org review requires this)
+personaizer.php                bootstrap: header, the three URL constants, PSR-4 loader, activation hooks
+src/Plugin.php                 wiring — every part registers its hooks here
+src/Options.php                every wp_option the plugin keeps, named once
+src/Data.php                   what Disconnect and uninstall.php remove (options, outbox, schedules, transients)
+
+src/Api/Client.php             the HTTP client: connect start + token, and the four sync calls (ik_ key)
+src/Api/Contracts.php          the ONLY file that knows the API's JSON — readers tested against fixtures/
+
+src/Site/Streams.php           the streams this site has: key, label, post type, count, type (files | catalog)
+src/Site/Profile.php           this site described by itself, in the website-extractor's result shape
+src/Site/Languages.php         every language the site publishes in, primary first (WPML / Polylang / TranslatePress / locale)
+
+src/Content/PostPayload.php    a post → a files record { id, fingerprint, title, content (markdown), links, images }
+src/Content/ProductPayload.php a WooCommerce product → a catalog record { …, categories, attributes, variants, … }
+src/Content/Markdown.php       rendered HTML → markdown (headings, lists, links, tables), pure PHP
+src/Content/Fingerprint.php    md5 of the canonical record — what the full-list check compares
+
+src/Sync/Outbox.php            the table: enqueue / claim / ack / fail / defer / release
+src/Sync/Hooks.php             WordPress + WooCommerce events → outbox rows (never an HTTP call in a hook)
+src/Sync/State.php             what PERSONAIZER last answered to sync (which streams are on…), cached a minute
+src/Sync/Worker.php            drains the outbox: one items call per batch of ≤100, acts on the answer
+src/Sync/Backfill.php          after a connect: every published record of every stream that is on → outbox
+src/Sync/Reconcile.php         daily: each stream's full list of { id, fingerprint } → missing/stale → outbox
+src/Sync/Daily.php             the one recurring WP-Cron tick everything hands-off rides
+
+src/Connect/Flow.php           Connect (start → consent screen → callback → token), Disconnect, Sync now
+src/Admin/Page.php + views/    the status page
+src/Widget/Embed.php           chat.js on every page, with the persona's public id
+src/Widget/IdentityToken.php   the signed-in-customer token endpoint (HS256 with the account's identity secret)
+src/Updater.php                self-hosted "update available" channel — stripped from --dev and --org builds
+
+fixtures/v1-integration/       the backend's recorded exchanges, copied by tools/sync-fixtures.sh
+tests/                         PHPUnit, no WordPress: Contracts against the fixtures, Markdown, Fingerprint, Languages
 ```
 
-## Two ways the plugin authenticates to PERSONAIZER
+## The four calls
 
-The backend (`api.personaizer.com`) accepts two different credentials, and this plugin uses both,
-deliberately, for different calls:
+Everything this site says to PERSONAIZER after it is connected goes through four calls, with its integration key
+(`ik_…`, `X-Api-Key`, server-side only — it must never reach the browser):
 
-1. **Integration key — `X-Api-Key: ik_…`.** Server-side only, read via `Personaizer_Api::integration_key()`
-   (`includes/class-personaizer-api.php`) from the option the plugin stores after Connect. It is the
-   credential of this site's *integration* on personaizer.com — the thing that owns the knowledge streams the
-   site syncs — and reaches only `/v1/integration/*`: reading the integration (which streams are on), reporting
-   inventory, pushing/deleting docs in a stream, sending a stream manifest, and checking subscription limits.
-   This key must never reach the browser. Every call also sends `X-Personaizer-Plugin-Version`.
+| Call | When | What |
+|---|---|---|
+| `POST /v1/integration/sync` | before a drain (cached 60 s), after any `integration.closed`, daily | reports every stream with a count and its type; answers status, brand, persona, plan, and every stream that has a source — on/off, type, counts, last check |
+| `PUT /v1/integration/streams/{stream}/items` | the worker, per batch | `{ upserts: [record…], deletes: [id…] }` → `{ written, deferred, rejected, deleted, deletes_busy }` |
+| `PUT /v1/integration/streams/{stream}/reconcile` | daily, after a backfill, Sync now | `{ generation, items: [{ id, fingerprint }] }` → `{ missing, stale, orphans_deleted, orphans_held, busy }` |
+| `DELETE /v1/integration` | Disconnect | freezes the integration there; nothing is deleted |
 
-2. **Public Persona ID — `X-Persona-Id: <GUID>`.** Safe to print into the page (it's the Intercom
-   `app_id` model). Used by the chat widget script (`chat.js`, injected on `wp_footer`) to call the
-   backend directly from the visitor's browser — no WordPress round-trip per chat message. The backend
-   binds this credential to the persona's *registered domains* (an Origin-header check a browser cannot
-   forge), so a Persona ID copied to another site simply won't authenticate from there.
+One refusal matters: `409 integration.closed` — the site is disconnected, or the stream is off or was never on.
+The worker drops the stream's rows and forgets the cached state; the next sync says what is on. `402
+limits.quota_exceeded` parks rows as *deferred* until a sync shows headroom. A per-record `rejected` keeps the row
+as *failed* with its reason (shown on the admin page, retried daily).
 
-Only ONE anonymous, unauthenticated call exists: `GET /v1/persona/profile`, used by the admin settings
-page to show the connected persona's name/avatar.
+The wire shapes are the backend's `IntegrationSyncContracts`; every exchange is recorded by the backend's contract
+test into `fixtures/v1-integration/*.json`, copied here by `tools/sync-fixtures.sh`, and read by
+`tests/ContractsTest.php`. When the backend changes a shape, this repo's tests fail before an installed site does.
 
-## Which streams sync is not a plugin setting
+## Connect
 
-The owner switches streams on and off on personaizer.com (the integration's page, beside every other source of
-the brand). The plugin reads that back from `GET /v1/integration` — cached a minute, refreshed after anything
-that could change it, and backed by the last good answer when the API is unreachable — and pushes only
-into streams that are on. A push into a stream that was switched off answers `409 integration.stream_disabled`,
-which the sync layer treats as "drop it, don't retry". Nothing about streams is stored locally as truth.
+OAuth Authorization-Code + PKCE, PERSONAIZER being the authorization server. **Connect** in the admin: this server
+calls `POST /api/integrations/connect/start` with the site's profile (`Site\Profile`), its inventory
+(`Site\Streams`), its callback and a PKCE challenge, gets a `connect_id`, and sends the browser to
+`{APP_URL}/connect?c=<id>&state=<csrf>`. The owner picks brand, persona and streams there and approves; the browser
+returns to `admin-post.php?action=personaizer_connect_callback&code=…&state=…`; this server redeems the code with
+the verifier at `POST /api/integrations/connect/token` and stores the credential, brand, persona and identity
+secret. Then: first sync, outbox cleared, backfill. A reconnect is the same flow; the backend resumes the
+integration and the consent screen opens on what is true now.
 
-## Content sync: three independent mechanisms, not one
+## Two credentials
 
-- **`Personaizer_Content_Sync`** and **`Personaizer_WooCommerce_Sync`** are the steady state: WordPress /
-  WooCommerce hooks (`wp_after_insert_post`, `woocommerce_update_product`, stock-change hooks, trash/delete
-  hooks) push one item at a time, the moment it changes. This is what "syncing" means day to day.
-- **`Personaizer_Backfill`** exists only because hooks can't retroactively fire for content that already
-  existed before Connect. It walks the site a batch at a time on WP-Cron (one HTTP round-trip per post
-  inline would blow `max_execution_time` on any real site) and is also the source of the admin page's
-  "syncing 40/120" progress.
-- **`Personaizer_Manifest`** exists because an event-driven design can silently drift — a missed WP-Cron
-  tick, a timeout, a product trashed while the plugin was inactive — and "we attempted a send" is not the
-  same claim as "the AI actually holds this." Daily (and after a backfill, and on demand) it walks each
-  stream that is on, fingerprints every published item (the hash of the exact payload it would push — the
-  same hash sent with every push), and hands the list to `PUT /v1/integration/streams/{stream}/manifest`. The
-  backend answers what it is missing or holds stale (queued for the retry tick to push) and removes what
-  the site no longer lists — behind rails of its own: a manifest that would orphan more than a quarter of a
-  stream is held until the next one agrees. On this side a stream's manifest is sent only when the site can
-  enumerate it fully right now (a post type that isn't registered — WooCommerce deactivated — is skipped,
-  never reported empty).
+1. **Integration key** (`ik_…`) — server-side only, reaches only `/v1/integration/*`.
+2. **Persona ID** (a GUID) — printed into the page for chat.js; the backend binds it to the site's registered
+   origin (an Origin check a browser cannot forge), so a copied id does not work elsewhere. chat.js calls
+   PERSONAIZER directly from the visitor's browser; no WordPress round-trip per message.
 
-Each stream (Pages, Posts, each public CPT, Products) is switched on/off independently on personaizer.com.
-Turning a stream off doesn't delete anything already synced; removals made while off are queued and
-re-verified once the stream resumes.
+## Why an outbox, not option arrays
 
-## Distribution: two update channels, mutually exclusive per build
+Hooks fire from concurrent requests, the worker from cron, the admin page from a third place; an array
+read-modify-written from all of them loses rows. A table with `UNIQUE (stream, external_id)` gives one row per
+record, idempotent enqueues (ten edits of a page collapse into one push), a state per row, and honest counts for
+the admin page. Payloads are never stored — a row is "push this record", and the record is built from the live
+post at drain time, so a post unpublished in the meantime becomes a delete.
 
-- **WordPress.org SVN** (the `--org` build): the directory's own update mechanism handles "new version
-  available" for every site that installed via the directory. Shipping a second, self-hosted updater
-  alongside this is a wordpress.org rejection reason, so the `--org` build strips
-  `class-personaizer-updater.php` entirely (see `build-zip.sh`).
-- **Self-hosted zip** (prod builds, this repo's GitHub Releases via `release.sh`): for anyone who
-  installs from a downloaded zip instead of the directory, `class-personaizer-updater.php` hooks into
-  WordPress's own update-transient mechanism (`pre_set_site_transient_update_plugins` /
-  `plugins_api`) so the native "update available" row, one-click Update, and background auto-updates all
-  work unchanged — polling a static JSON manifest, not a live API endpoint (every install polls it twice
-  a day forever; a static file is the right shape for that, an API endpoint is not).
+## Distribution
 
-  That manifest is a release ASSET, reached through `/releases/latest/download/personaizer.json` — a
-  permalink that always resolves to the newest release. So the page clients download from and the file
-  installed sites poll are the same release, and cutting one is the entire publishing step. Before 1.2.3
-  both lived on our own blob container, which meant a release was only real once someone remembered to
-  run a second upload script; the two drifted, and a version published here but never uploaded there was
-  invisible to every installed site. The updater's same-host rule
-  (`Personaizer_Updater::trusted_package`) is satisfied because the manifest and the zip it advertises
-  are assets of the same release on github.com.
-
-  `--dev` builds ship WITHOUT the updater: there is one release line now, so a dev build that polled it
-  would offer the tester a prod package and quietly replace the dev URLs it was installed for.
-
-A given zip ships with exactly one of these active, decided at build time by `build-zip.sh`'s flag.
-
-## Admin settings page
-
-`personaizer_chat_page()` in `personaizer.php` is deliberately *not* a WordPress Settings API page —
-nothing the owner configures there is stored as a WordPress "setting" in the traditional sense beyond one
-on/off toggle (whether to recognize signed-in customers). Everything else —
-widget appearance, greeting, FAQ, the persona itself — lives on personaizer.com and is fetched for
-display, not edited here. The page's CSS/JS live in `assets/admin-page.{css,js}` and are registered via
-`admin_enqueue_scripts` scoped to just this page (`toplevel_page_personaizer`); the one piece of
-per-request dynamic behavior (whether to auto-reload while a sync is still running) is passed to the
-static JS via `wp_add_inline_script` with a small JSON config object, not by echoing a `<script>` tag.
+Prod builds carry `src/Updater.php`, which hooks WordPress's own update-transient mechanism and polls a static
+manifest at `github.com/…/releases/latest/download/personaizer.json`; `--dev` builds (dev URLs) and `--org` builds
+(wordpress.org serves updates) strip it. `build-zip.sh` guards that the source defaults to production and that
+the header, `PERSONAIZER_VERSION` and readme `Stable tag` agree; `release.sh` cuts the GitHub release.

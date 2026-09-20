@@ -1,0 +1,64 @@
+{
+  "request": {
+    "site_name": "Example Shop",
+    "inventory": [
+      {
+        "stream_key": "pages",
+        "label": "Pages",
+        "count": 12,
+        "type": "files"
+      },
+      {
+        "stream_key": "posts",
+        "label": "Posts",
+        "count": 3,
+        "type": "files"
+      },
+      {
+        "stream_key": "products",
+        "label": "Products",
+        "count": 40,
+        "type": "catalog"
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "status": "active",
+    "brand": {
+      "id": "<guid>",
+      "name": "shop.example.com"
+    },
+    "persona": {
+      "id": "<guid>",
+      "name": "Shop Assistant",
+      "avatar_url": null,
+      "building": false
+    },
+    "plan": {
+      "name": "Test Plan",
+      "knowledge_units_used": 120,
+      "knowledge_units_limit": 2000
+    },
+    "streams": [
+      {
+        "stream_key": "pages",
+        "enabled": true,
+        "type": "files",
+        "source_id": "<guid>",
+        "document_count": 0,
+        "ready_count": 0,
+        "last_reconcile": null
+      },
+      {
+        "stream_key": "products",
+        "enabled": true,
+        "type": "catalog",
+        "source_id": "<guid>",
+        "document_count": 0,
+        "ready_count": 0,
+        "last_reconcile": null
+      }
+    ]
+  }
+}

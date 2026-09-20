@@ -104,7 +104,8 @@ site's Plugins → Add New search.
 1. **Bump the version in three places** (guarded by `build-zip.sh` — it refuses to build if these
    disagree): the `personaizer.php` header `Version:`, the `PERSONAIZER_VERSION` `define()`, and
    `personaizer/readme.txt`'s `Stable tag:`.
-2. Add a `== Changelog ==` entry in `readme.txt`.
+2. Add a `== Changelog ==` entry in `readme.txt`. If the backend's contract fixtures changed, run
+   `tools/sync-fixtures.sh` and make the tests green first (`php tools/phpunit.phar`).
 3. **WordPress.org**: copy the new files into `trunk/`, then:
    ```bash
    svn ci -m "<version>: <summary>"

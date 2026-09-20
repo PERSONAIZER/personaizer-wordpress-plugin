@@ -1,0 +1,15 @@
+{
+  "request": {
+    "code": "<code>",
+    "code_verifier": "<pkce>",
+    "redirect_uri": "https://shop.example.com/wp-admin/admin-post.php?action=personaizer_connect_callback"
+  },
+  "status": 200,
+  "response": {
+    "integration_id": "<guid>",
+    "integration_key": "<ik_key>",
+    "brand_id": "<guid>",
+    "persona_id": "<guid>",
+    "identity_secret": "<identity_secret>"
+  }
+}

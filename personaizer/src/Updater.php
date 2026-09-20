@@ -1,4 +1,6 @@
 <?php
+namespace Personaizer;
+
 /**
  * Self-hosted update channel.
  *
@@ -48,7 +50,7 @@ if ( ! defined( 'PERSONAIZER_UPDATE_MANIFEST_URL' ) ) {
     define( 'PERSONAIZER_UPDATE_MANIFEST_URL', 'https://github.com/PersonAIzer/personaizer-wordpress-plugin/releases/latest/download/personaizer.json' );
 }
 
-class Personaizer_Updater {
+final class Updater {
 
     const SLUG = 'personaizer';
 
@@ -108,7 +110,7 @@ class Personaizer_Updater {
 
     /** The compact object the update transient holds (both for `response` and `no_update`). */
     private static function transient_entry( array $manifest ) {
-        $entry = new stdClass();
+        $entry = new \stdClass();
         $entry->slug         = self::SLUG;
         $entry->plugin       = self::basename();
         $entry->new_version  = $manifest['version'];
@@ -135,7 +137,7 @@ class Personaizer_Updater {
         $manifest = self::manifest();
         if ( ! $manifest ) return $result;
 
-        $info = new stdClass();
+        $info = new \stdClass();
         $info->name           = $manifest['name'];
         $info->slug           = self::SLUG;
         $info->version        = $manifest['version'];

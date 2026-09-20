@@ -1,0 +1,22 @@
+{
+  "request": {
+    "connect_id": "<guid>",
+    "brand": {
+      "id": "<guid>"
+    },
+    "persona": {
+      "id": "<guid>"
+    },
+    "streams": [
+      "pages",
+      "products"
+    ]
+  },
+  "status": 200,
+  "response": {
+    "code": "<code>",
+    "brand_id": "<guid>",
+    "persona_id": "<guid>",
+    "job_id": null
+  }
+}

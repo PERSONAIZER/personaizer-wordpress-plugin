@@ -1,0 +1,11 @@
+{
+  "request": null,
+  "status": 409,
+  "response": {
+    "type": "https://www.personaizer.com/developers/guides#error-integration.closed",
+    "title": "Stream 'posts' is not switched on for this site — stop syncing it and ask again with the next sync.",
+    "status": 409,
+    "code": "integration.closed",
+    "traceId": "<trace_id>"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "request": null,
+  "status": 200,
+  "response": {
+    "status": "disconnected",
+    "brand": {
+      "id": "<guid>",
+      "name": "shop.example.com"
+    },
+    "persona": {
+      "id": "<guid>",
+      "name": "Shop Assistant",
+      "avatar_url": null,
+      "building": false
+    },
+    "plan": {
+      "name": "Test Plan",
+      "knowledge_units_used": 120,
+      "knowledge_units_limit": 2000
+    },
+    "streams": [
+      {
+        "stream_key": "pages",
+        "enabled": false,
+        "type": "files",
+        "source_id": "<guid>",
+        "document_count": 1,
+        "ready_count": 0,
+        "last_reconcile": null
+      },
+      {
+        "stream_key": "products",
+        "enabled": false,
+        "type": "catalog",
+        "source_id": "<guid>",
+        "document_count": 1,
+        "ready_count": 0,
+        "last_reconcile": {
+          "generation": 12,
+          "missing": 1,
+          "stale": 0,
+          "held_orphans": 0,
+          "at": "<timestamp>"
+        }
+      }
+    ]
+  }
+}

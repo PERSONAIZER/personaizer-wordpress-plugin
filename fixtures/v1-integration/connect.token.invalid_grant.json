@@ -1,0 +1,11 @@
+{
+  "request": null,
+  "status": 400,
+  "response": {
+    "type": "https://www.personaizer.com/developers/guides#error-invalid_grant",
+    "title": "Invalid or expired authorization code",
+    "status": 400,
+    "code": "invalid_grant",
+    "traceId": "<trace_id>"
+  }
+}

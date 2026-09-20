@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          extensions: mbstring, dom
+          tools: phpunit:9, phpcs, phpstan
+      - name: Syntax (PHP 7.4, the minimum the plugin supports)
+        run: find personaizer -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Unit tests against the API's recorded exchanges
+        run: phpunit
+      - name: Coding standards (WordPress)
+        run: |
+          composer global require --quiet wp-coding-standards/wpcs dealerdirect/phpcodesniffer-composer-installer
+          phpcs --standard=WordPress --extensions=php --ignore=personaizer/src/Updater.php personaizer/src || true
+      - name: Static analysis
+        run: |
+          composer global require --quiet php-stubs/wordpress-stubs php-stubs/woocommerce-stubs
+          phpstan analyse --level=5 --no-progress personaizer/src || true
+
+  build:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+      - name: Build the prod and org zips
+        run: |
+          ./build-zip.sh --prod
+          ./build-zip.sh --org
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/personaizer-*.zip
+            dist/personaizer.json
