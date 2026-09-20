@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.2
+Stable tag: 3.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,9 @@ In WordPress it stores your integration key, brand and persona ids, your account
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 3.0.3 =
+* No code change: a code-standards annotation in the outbox was scoped so the wordpress.org Plugin Check report reads clean.
 
 = 3.0.2 =
 * The batch insert into the outbox builds its placeholders inline, and the backfill and daily check no longer set `suppress_filters` explicitly — `get_posts()` already does, which is what keeps a language plugin from hiding the other languages' records. Both are what wordpress.org's Plugin Check asked for on 3.0.1.

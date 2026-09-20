@@ -134,7 +134,7 @@ final class Outbox {
 					$args
 				)
 			);
-			// phpcs:enable
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders
 		}
 	}
 
