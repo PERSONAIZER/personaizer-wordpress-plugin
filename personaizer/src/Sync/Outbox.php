@@ -122,20 +122,19 @@ final class Outbox {
 		self::ensure();
 		$now = current_time( 'mysql', true );
 		foreach ( array_chunk( $rows, 100 ) as $chunk ) {
-			$values = array();
-			$args   = array( self::table() );
+			$args = array( self::table() );
 			foreach ( $chunk as $row ) {
-				$values[] = '(%s, %s, %s, %d, %s, 0, NULL, NULL, %s, %s)';
 				array_push( $args, $stream, $row['external_id'], self::UPSERT, (int) $row['post_id'], self::QUEUED, $now, $now );
 			}
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders -- one placeholder group per row, built from a literal; every value is in $args
 			$wpdb->query(
 				$wpdb->prepare(
-					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $values holds only placeholder groups; every value is in $args
-					'INSERT INTO %i (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at) VALUES ' . implode( ', ', $values ) .
+					'INSERT INTO %i (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at) VALUES ' . implode( ', ', array_fill( 0, count( $chunk ), '(%s, %s, %s, %d, %s, 0, NULL, NULL, %s, %s)' ) ) .
 					' ON DUPLICATE KEY UPDATE op = VALUES(op), post_id = VALUES(post_id), state = VALUES(state), attempts = 0, next_at = NULL, last_error = NULL, updated_at = VALUES(updated_at)',
 					$args
 				)
 			);
+			// phpcs:enable
 		}
 	}
 

@@ -145,14 +145,15 @@ final class Reconcile {
 		}
 		$posts = get_posts(
 			array(
-				'post_type'        => $all[ $stream ]['post_type'],
-				'post_status'      => 'publish',
-				'posts_per_page'   => self::SLICE,
-				'offset'           => $offset,
-				'orderby'          => 'ID',
-				'order'            => 'ASC',
-				'no_found_rows'    => true,
-				'suppress_filters' => true,
+				'post_type'      => $all[ $stream ]['post_type'],
+				'post_status'    => 'publish',
+				'posts_per_page' => self::SLICE,
+				'offset'         => $offset,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				// get_posts() suppresses query filters by default, so a language plugin's "current language only"
+				// filter does not hide the other languages' records from the enumeration.
+				'no_found_rows'  => true,
 			)
 		);
 		foreach ( $posts as $post ) {

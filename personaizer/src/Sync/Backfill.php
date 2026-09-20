@@ -87,15 +87,16 @@ final class Backfill {
 		}
 		$ids  = get_posts(
 			array(
-				'post_type'        => $all[ $stream ]['post_type'],
-				'post_status'      => 'publish',
-				'posts_per_page'   => self::PAGE,
-				'offset'           => $offset,
-				'orderby'          => 'ID',
-				'order'            => 'ASC',
-				'fields'           => 'ids',
-				'no_found_rows'    => true,
-				'suppress_filters' => true,
+				'post_type'      => $all[ $stream ]['post_type'],
+				'post_status'    => 'publish',
+				'posts_per_page' => self::PAGE,
+				'offset'         => $offset,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				'fields'         => 'ids',
+				// get_posts() suppresses query filters by default, so a language plugin's "current language only"
+				// filter does not hide the other languages' records from the enumeration.
+				'no_found_rows'  => true,
 			)
 		);
 		$rows = array();
