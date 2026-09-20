@@ -1,6 +1,8 @@
 /* PERSONAIZER admin page — registered via admin_enqueue_scripts, scoped to toplevel_page_personaizer. */
 .pz-wrap { max-width: 880px; }
 .pz-title { display: flex; align-items: center; gap: 12px; }
+.pz-logo { width: 32px; height: 32px; flex-shrink: 0; }
+.pz-logo--hero { width: 72px; height: 72px; display: block; margin-bottom: 8px; }
 .pz-pill { display: inline-block; font-size: 12px; font-weight: 600; line-height: 1; padding: 6px 10px; border-radius: 999px; background: #f0f0f1; color: #50575e; }
 .pz-pill--on { background: #e6f5ea; color: #1d6b32; }
 .pz-pill--off { background: #fcf0f1; color: #8a1f2b; }

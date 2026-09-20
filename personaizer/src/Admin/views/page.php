@@ -33,7 +33,7 @@ foreach ( $model['streams'] as $stream ) {
 }
 ?>
 <div class="wrap pz-wrap">
-	<h1 class="pz-title">PERSONAIZER
+	<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="32" height="32">PERSONAIZER
 		<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
 			<span class="pz-pill pz-pill--on"><?php echo $persona ? 'Live on your site' : 'Connected'; ?></span>
 		<?php elseif ( $model['connected'] && $sync_status === 'disconnected' ) : ?>
@@ -52,7 +52,8 @@ foreach ( $model['streams'] as $stream ) {
 	<?php endif; ?>
 
 	<?php if ( ! $model['connected'] ) : ?>
-		<div class="pz-card pz-card--hero">
+		<div class="pz-card pz-card--hero pz-card--connect">
+			<img class="pz-logo pz-logo--hero" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="72" height="72">
 			<h2>Connect this site to PERSONAIZER</h2>
 			<p>Your pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them. You'll pick the brand, the persona and what to sync on personaizer.com — the form is filled in from this site.</p>
 			<a class="button button-primary button-hero" data-pz-connect href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>" target="_blank">Connect to PERSONAIZER</a>

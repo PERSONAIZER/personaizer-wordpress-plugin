@@ -105,6 +105,7 @@ final class Page {
 			'error'     => Options::last_error(),
 			'last_push' => (int) get_option( Options::LAST_PUSH, 0 ),
 			'app_url'   => rtrim( PERSONAIZER_APP_URL, '/' ),
+			'logo'      => plugins_url( 'assets/logo.svg', PERSONAIZER_PLUGIN_FILE ),
 			'dashboard' => $connected ? Flow::dashboard_url() : '',
 			'cron_off'  => defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON,
 			'notice'    => self::notice(),
@@ -181,9 +182,9 @@ final class Page {
 		return wp_nonce_url( admin_url( 'admin-post.php?action=' . $action ), $action );
 	}
 
-	/** The menu icon: an inline SVG as a data URI, which is how WordPress takes a custom dashicon. */
+	/** The menu icon: the mark as a data URI, flat so WordPress can repaint it in the admin colour scheme. */
 	private static function icon() {
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- an SVG, not code
-		return 'data:image/svg+xml;base64,' . base64_encode( '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="#a7aaad" d="M10 2a8 8 0 0 0-6.9 12l-1 4 4.2-1A8 8 0 1 0 10 2zm-3 6h6v2H7V8zm0 3h4v2H7v-2z"/></svg>' );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode,WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- the plugin's own SVG file, not code and not remote
+		return 'data:image/svg+xml;base64,' . base64_encode( (string) file_get_contents( PERSONAIZER_PLUGIN_DIR . '/assets/menu-icon.svg' ) );
 	}
 }
