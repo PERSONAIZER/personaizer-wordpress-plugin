@@ -67,7 +67,7 @@ echo "✓ version $VERSION agrees across header, PERSONAIZER_VERSION and readme 
 # Where a PUBLISHED prod zip will live (the manifest advertises this URL). Dev builds don't get a manifest.
 # A release's assets are served from github.com, the same host the manifest permalink resolves against —
 # which is what satisfies the updater's same-host rule (Personaizer_Updater::trusted_package).
-DIST_BASE="${PERSONAIZER_DIST_BASE:-https://github.com/PersonAIzer/personaizer-wordpress-plugin/releases/download/v$VERSION}"
+DIST_BASE="${PERSONAIZER_DIST_BASE:-https://github.com/PERSONAIZER/personaizer-wordpress-plugin/releases/download/v$VERSION}"
 
 # ── Guard: the SOURCE must default to PRODUCTION (both build modes) ────────────
 # Local/dev URLs belong in wp-config.php or a --dev build, never in the source. Comments may document

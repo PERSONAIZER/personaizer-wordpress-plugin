@@ -47,7 +47,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * holds here because the manifest and the zip are assets of the same release on github.com.
  */
 if ( ! defined( 'PERSONAIZER_UPDATE_MANIFEST_URL' ) ) {
-    define( 'PERSONAIZER_UPDATE_MANIFEST_URL', 'https://github.com/PersonAIzer/personaizer-wordpress-plugin/releases/latest/download/personaizer.json' );
+    define( 'PERSONAIZER_UPDATE_MANIFEST_URL', 'https://github.com/PERSONAIZER/personaizer-wordpress-plugin/releases/latest/download/personaizer.json' );
 }
 
 final class Updater {
