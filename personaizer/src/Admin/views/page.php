@@ -44,7 +44,7 @@ foreach ( $m['streams'] as $s ) {
         <div class="pz-card pz-card--hero">
             <h2>Connect this site to PERSONAIZER</h2>
             <p>Your pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them. You'll pick the brand, the persona and what to sync on personaizer.com — the form is filled in from this site.</p>
-            <a class="button button-primary button-hero" href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">Connect to PERSONAIZER</a>
+            <a class="button button-primary button-hero" data-pz-connect href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>" target="_blank">Connect to PERSONAIZER</a>
         </div>
     <?php else : ?>
 
