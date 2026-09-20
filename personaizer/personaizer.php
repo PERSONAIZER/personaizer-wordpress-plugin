@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: PERSONAIZER
- * Plugin URI:  https://personaizer.com
+ * Plugin URI:  https://github.com/PERSONAIZER/personaizer-wordpress-plugin
  * Description: Connect this site to PERSONAIZER: its pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them.
  * Version:     3.0.0
  * Requires at least: 5.6
