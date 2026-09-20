@@ -108,7 +108,17 @@ final class Flow {
         State::get( true );
         Backfill::start();
 
-        self::back( array( 'pz_connected' => '1' ) );
+        // Land on the brand's knowledge map with the persona's chat open: the sync shows on the source cards there. The
+        // WP admin page (the tab Connect was clicked in) reloads to "connected" on its own.
+        wp_safe_redirect( self::dashboard_url() );
+        exit;
+    }
+
+    /** Where the owner sees this site on personaizer.com: the brand's knowledge map, the persona picked when there is one. */
+    public static function dashboard_url() {
+        $args = array( 'brand' => Options::brand_id() );
+        if ( Options::persona_id() !== '' ) $args['persona'] = Options::persona_id();
+        return add_query_arg( $args, rtrim( PERSONAIZER_APP_URL, '/' ) . '/knowledge' );
     }
 
     /** Let go: the integration freezes on PERSONAIZER; nothing is deleted there. Locally everything goes. */

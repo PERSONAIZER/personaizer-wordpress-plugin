@@ -73,7 +73,7 @@ foreach ( $m['streams'] as $s ) {
                     <?php endif; ?>
                 </div>
                 <div class="pz-hero__actions">
-                    <a class="button button-primary" href="<?php echo esc_url( $m['app_url'] . ( $persona ? '/persona/' . $persona['id'] : '/knowledge' ) ); ?>" target="_blank" rel="noopener">Open in PERSONAIZER</a>
+                    <a class="button button-primary" href="<?php echo esc_url( $m['dashboard'] ); ?>" target="_blank" rel="noopener">Open in PERSONAIZER</a>
                 </div>
             </div>
             <?php if ( $status === 'disconnected' ) : ?>
@@ -85,7 +85,7 @@ foreach ( $m['streams'] as $s ) {
 
         <div class="pz-card">
             <h2>What it learns from this site</h2>
-            <p class="pz-muted">Switch streams on and off on <a href="<?php echo esc_url( $m['app_url'] . '/knowledge' ); ?>" target="_blank" rel="noopener">personaizer.com</a>. New and edited content keeps syncing by itself.</p>
+            <p class="pz-muted">Switch streams on and off on <a href="<?php echo esc_url( $m['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>. New and edited content keeps syncing by itself.</p>
             <table class="widefat striped pz-streams">
                 <thead><tr><th>Stream</th><th>Status</th><th>Synced</th><th>Waiting</th><th>Last check</th></tr></thead>
                 <tbody>

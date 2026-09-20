@@ -45,6 +45,10 @@ final class Options {
         return trim( (string) get_option( self::INTEGRATION_KEY, '' ) );
     }
 
+    public static function brand_id() {
+        return trim( (string) get_option( self::BRAND_ID, '' ) );
+    }
+
     public static function persona_id() {
         return trim( (string) get_option( self::PERSONA_ID, '' ) );
     }

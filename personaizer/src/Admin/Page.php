@@ -82,6 +82,7 @@ final class Page {
             'error'       => Options::last_error(),
             'last_push'   => (int) get_option( Options::LAST_PUSH, 0 ),
             'app_url'     => rtrim( PERSONAIZER_APP_URL, '/' ),
+            'dashboard'   => $connected ? Flow::dashboard_url() : '',
             'cron_off'    => defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON,
             'notice'      => self::notice(),
         );
