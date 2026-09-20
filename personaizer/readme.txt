@@ -1,10 +1,10 @@
 === PERSONAIZER ===
 Contributors: personaizer
 Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
-Requires at least: 5.6
+Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,11 @@ In WordPress it stores your integration key, brand and persona ids, your account
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 3.0.1 =
+* Requires WordPress 6.2 or newer: every query on the plugin's outbox table is now fully prepared, the table name through WordPress's `%i` identifier placeholder.
+* The admin page's working variables no longer live in the request's global scope.
+* The plugin's URI is its repository, not the company site.
 
 = 3.0.0 =
 * Rebuilt from the ground up around one outbox: every change on the site becomes a row, and a worker sends rows to PERSONAIZER in batches of up to 100 — a 500-page backfill is a handful of requests instead of 500, and nothing is lost when a request dies mid-way.

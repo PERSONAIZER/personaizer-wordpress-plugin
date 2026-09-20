@@ -40,7 +40,9 @@ final class Data {
 
 	private static function clear_transients() {
 		global $wpdb;
-		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_personaizer\\_%' OR option_name LIKE '\\_transient\\_timeout\\_personaizer\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_site\\_transient\\_personaizer\\_%' OR option_name LIKE '\\_site\\_transient\\_timeout\\_personaizer\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- a one-time sweep of this plugin's own transients on disconnect / uninstall;
+		// there is no API that deletes transients by prefix, and the LIKE patterns are literals.
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_personaizer\\_%' OR option_name LIKE '\\_transient\\_timeout\\_personaizer\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- literal patterns, core table
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_site\\_transient\\_personaizer\\_%' OR option_name LIKE '\\_site\\_transient\\_timeout\\_personaizer\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- literal patterns, core table
 	}
 }

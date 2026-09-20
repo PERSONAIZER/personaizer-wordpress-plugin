@@ -13,25 +13,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$state       = $model['state'];
-$persona     = $state['persona'] ?? null;
-$plan        = $state['plan'] ?? null;
-$sync_status = $state['status'] ?? '';
-// Rows of a stream that is off are not being sent — they wait for the owner to switch it on. Count them apart.
-$queued   = 0;
-$parked   = 0;
-$deferred = 0;
-$failed   = 0;
-foreach ( $model['streams'] as $stream ) {
-	if ( $stream['enabled'] ) {
-		$queued += $stream['queue']['queued'];
-	} else {
-		$parked += $stream['queue']['queued'];
+// The page is one function so its working variables are locals, not globals of the request.
+( static function ( array $model ) {
+
+	$state       = $model['state'];
+	$persona     = $state['persona'] ?? null;
+	$plan        = $state['plan'] ?? null;
+	$sync_status = $state['status'] ?? '';
+	// Rows of a stream that is off are not being sent — they wait for the owner to switch it on. Count them apart.
+	$queued   = 0;
+	$parked   = 0;
+	$deferred = 0;
+	$failed   = 0;
+	foreach ( $model['streams'] as $stream ) {
+		if ( $stream['enabled'] ) {
+			$queued += $stream['queue']['queued'];
+		} else {
+			$parked += $stream['queue']['queued'];
+		}
+		$deferred += $stream['queue']['deferred'];
+		$failed   += $stream['queue']['failed'];
 	}
-	$deferred += $stream['queue']['deferred'];
-	$failed   += $stream['queue']['failed'];
-}
-?>
+	?>
 <div class="wrap pz-wrap">
 	<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="32" height="32">PERSONAIZER
 		<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
@@ -274,3 +277,5 @@ elseif ( $q['queued'] ) :
 		</details>
 	<?php endif; ?>
 </div>
+	<?php
+} )( $model );

@@ -18,10 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * States: queued (push at next drain, once next_at has passed), deferred (the plan had no room — released when the
  * plan shows headroom), failed (refused for what it carried — retried daily, shown on the admin page).
  */
-// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- every statement
-// below is $wpdb->prepare()'d; the one interpolated piece is the table name, which is $wpdb->prefix . 'personaizer_outbox'
-// (self::table()), and the IN (...) lists are integers cast with intval() before they are joined. The UnfinishedPrepare
-// warning is the batch INSERT, whose placeholders are built into $values and whose arguments are the $args array.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery -- this IS a database table: a purpose-built queue that hooks write
+// from concurrent requests and one worker drains. Nothing here is cacheable state; every statement is
+// $wpdb->prepare()'d, the table name through the %i identifier placeholder (WordPress 6.2).
 final class Outbox {
 
 	const UPSERT = 'upsert';
@@ -45,6 +44,7 @@ final class Outbox {
 		$table   = self::table();
 		$charset = $wpdb->get_charset_collate();
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- our own table on activation; dbDelta takes the DDL as text and $table is $wpdb->prefix . 'personaizer_outbox'
 		dbDelta(
 			"CREATE TABLE {$table} (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -75,7 +75,7 @@ final class Outbox {
 
 	public static function drop() {
 		global $wpdb;
-		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table() );
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', self::table() ) );
 		delete_option( self::SCHEMA_OPTION );
 	}
 
@@ -97,9 +97,10 @@ final class Outbox {
 		$now = current_time( 'mysql', true );
 		$wpdb->query(
 			$wpdb->prepare(
-				'INSERT INTO ' . self::table() . ' (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at)
+				'INSERT INTO %i (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at)
              VALUES (%s, %s, %s, %d, %s, 0, NULL, NULL, %s, %s)
              ON DUPLICATE KEY UPDATE op = VALUES(op), post_id = VALUES(post_id), state = VALUES(state), attempts = 0, next_at = NULL, last_error = NULL, updated_at = VALUES(updated_at)',
+				self::table(),
 				$stream,
 				$external_id,
 				$op,
@@ -122,14 +123,15 @@ final class Outbox {
 		$now = current_time( 'mysql', true );
 		foreach ( array_chunk( $rows, 100 ) as $chunk ) {
 			$values = array();
-			$args   = array();
+			$args   = array( self::table() );
 			foreach ( $chunk as $row ) {
 				$values[] = '(%s, %s, %s, %d, %s, 0, NULL, NULL, %s, %s)';
 				array_push( $args, $stream, $row['external_id'], self::UPSERT, (int) $row['post_id'], self::QUEUED, $now, $now );
 			}
 			$wpdb->query(
 				$wpdb->prepare(
-					'INSERT INTO ' . self::table() . ' (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at) VALUES ' . implode( ', ', $values ) .
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $values holds only placeholder groups; every value is in $args
+					'INSERT INTO %i (stream, external_id, op, post_id, state, attempts, next_at, last_error, created_at, updated_at) VALUES ' . implode( ', ', $values ) .
 					' ON DUPLICATE KEY UPDATE op = VALUES(op), post_id = VALUES(post_id), state = VALUES(state), attempts = 0, next_at = NULL, last_error = NULL, updated_at = VALUES(updated_at)',
 					$args
 				)
@@ -148,8 +150,8 @@ final class Outbox {
 		global $wpdb;
 		return (array) $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT id, stream, external_id, op, post_id, attempts FROM ' . self::table() .
-				' WHERE stream = %s AND state = %s AND (next_at IS NULL OR next_at <= %s) ORDER BY id ASC LIMIT %d',
+				'SELECT id, stream, external_id, op, post_id, attempts FROM %i WHERE stream = %s AND state = %s AND (next_at IS NULL OR next_at <= %s) ORDER BY id ASC LIMIT %d',
+				self::table(),
 				$stream,
 				self::QUEUED,
 				current_time( 'mysql', true ),
@@ -163,7 +165,8 @@ final class Outbox {
 		global $wpdb;
 		return (array) $wpdb->get_col(
 			$wpdb->prepare(
-				'SELECT DISTINCT stream FROM ' . self::table() . ' WHERE state = %s AND (next_at IS NULL OR next_at <= %s)',
+				'SELECT DISTINCT stream FROM %i WHERE state = %s AND (next_at IS NULL OR next_at <= %s)',
+				self::table(),
 				self::QUEUED,
 				current_time( 'mysql', true )
 			)
@@ -196,7 +199,8 @@ final class Outbox {
 		global $wpdb;
 		$wpdb->query(
 			$wpdb->prepare(
-				'UPDATE ' . self::table() . ' SET state = %s, next_at = NULL, updated_at = %s WHERE state = %s',
+				'UPDATE %i SET state = %s, next_at = NULL, updated_at = %s WHERE state = %s',
+				self::table(),
 				self::QUEUED,
 				current_time( 'mysql', true ),
 				$state
@@ -207,12 +211,12 @@ final class Outbox {
 	/** The owner closed the stream on personaizer.com: nothing of it is pushed until it opens again. */
 	public static function drop_stream( $stream ) {
 		global $wpdb;
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table() . ' WHERE stream = %s', $stream ) );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE stream = %s', self::table(), $stream ) );
 	}
 
 	public static function clear() {
 		global $wpdb;
-		$wpdb->query( 'DELETE FROM ' . self::table() );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', self::table() ) );
 	}
 
 	// ── the admin page's side ──
@@ -221,7 +225,7 @@ final class Outbox {
 	public static function counts() {
 		global $wpdb;
 		self::ensure();
-		$rows = (array) $wpdb->get_results( 'SELECT stream, state, COUNT(*) AS n FROM ' . self::table() . ' GROUP BY stream, state' );
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT stream, state, COUNT(*) AS n FROM %i GROUP BY stream, state', self::table() ) );
 		$out  = array();
 		foreach ( $rows as $row ) {
 			if ( ! isset( $out[ $row->stream ] ) ) {
@@ -243,7 +247,8 @@ final class Outbox {
 		global $wpdb;
 		return (array) $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT stream, external_id, last_error, updated_at FROM ' . self::table() . ' WHERE state = %s ORDER BY updated_at DESC LIMIT %d',
+				'SELECT stream, external_id, last_error, updated_at FROM %i WHERE state = %s ORDER BY updated_at DESC LIMIT %d',
+				self::table(),
 				self::FAILED,
 				(int) $limit
 			)
@@ -258,7 +263,13 @@ final class Outbox {
 		if ( empty( $ids ) ) {
 			return;
 		}
-		$wpdb->query( 'DELETE FROM ' . self::table() . ' WHERE id IN (' . implode( ',', $ids ) . ')' );
+		$wpdb->query(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- one %d per id, the ids are the arguments
+				'DELETE FROM %i WHERE id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')',
+				array_merge( array( self::table() ), $ids )
+			)
+		);
 	}
 
 	private static function set_state( array $ids, $state, $next_at, $error, $bump_attempts = false ) {
@@ -269,12 +280,9 @@ final class Outbox {
 		}
 		$wpdb->query(
 			$wpdb->prepare(
-				'UPDATE ' . self::table() . ' SET state = %s, next_at = %s, last_error = %s, attempts = attempts + %d, updated_at = %s WHERE id IN (' . implode( ',', $ids ) . ')',
-				$state,
-				$next_at,
-				$error,
-				$bump_attempts ? 1 : 0,
-				current_time( 'mysql', true )
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- one %d per id, the ids are the arguments
+				'UPDATE %i SET state = %s, next_at = %s, last_error = %s, attempts = attempts + %d, updated_at = %s WHERE id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')',
+				array_merge( array( self::table(), $state, $next_at, $error, $bump_attempts ? 1 : 0, current_time( 'mysql', true ) ), $ids )
 			)
 		);
 	}
