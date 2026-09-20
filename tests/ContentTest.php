@@ -39,4 +39,14 @@ final class ContentTest extends TestCase {
         $this->assertSame( array( 'zh', 'pt' ), Languages::normalize( array( 'zh-Hans-CN', 'pt_BR' ) ) );
         $this->assertSame( array(), Languages::normalize( array( '', '-' ) ) );
     }
+
+    public function test_alt_text_that_is_only_the_filename_is_no_description(): void {
+        $alt = array( \Personaizer\Content\PostPayload::class, 'alt_or_nothing' );
+        $this->assertSame( '', $alt( 'shape_3.png', 'https://x.com/wp-content/uploads/2026/06/shape_3.png' ) );
+        $this->assertSame( '', $alt( 'shape_3', 'https://x.com/wp-content/uploads/2026/06/shape_3.png' ) );
+        $this->assertSame( '', $alt( 'LED', 'https://x.com/wp-content/uploads/2026/06/LED-1024x513.png' ) );
+        $this->assertSame( 'კვების ბლოკი', $alt( 'კვების ბლოკი', 'https://x.com/wp-content/uploads/2026/06/psu-1024x513.png' ) );
+        $this->assertSame( 'Our team in Tbilisi', $alt( ' Our team in Tbilisi ', 'https://x.com/team.jpg' ) );
+        $this->assertSame( '', $alt( '', 'https://x.com/team.jpg' ) );
+    }
 }

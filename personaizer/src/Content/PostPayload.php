@@ -52,7 +52,13 @@ final class PostPayload {
 
     /**
      * The featured image (primary) plus inline <img> in the rendered content — absolute http(s) URLs only, capped
-     * so an image-heavy post can't flood the library (the API caps again).
+     * so an image-heavy post can't flood the library (the API caps again). The first image is the primary: the
+     * featured image when there is one, else the first inline image.
+     *
+     * Descriptions: PERSONAIZER runs vision on the PRIMARY image only when it arrives without a description, and folds
+     * the caption into what the record is searched on — so the primary always goes empty (a WordPress alt is rarely a
+     * caption, and often just the filename). The others are never analysed, so their alt text is the only words they
+     * will ever have and rides along — unless it is the filename WordPress pasted in on upload.
      *
      * @return array<int,array{url:string,description:string,is_primary:bool}>
      */
@@ -64,8 +70,7 @@ final class PostPayload {
         if ( $thumb_id ) {
             $url = wp_get_attachment_image_url( $thumb_id, 'full' );
             if ( $url ) {
-                $alt          = trim( (string) get_post_meta( $thumb_id, '_wp_attachment_image_alt', true ) );
-                $images[]     = array( 'url' => $url, 'description' => $alt, 'is_primary' => true );
+                $images[]     = array( 'url' => $url, 'description' => '', 'is_primary' => true );
                 $seen[ $url ] = true;
             }
         }
@@ -77,11 +82,27 @@ final class PostPayload {
                 $url = html_entity_decode( $tag[2], ENT_QUOTES );
                 if ( ! preg_match( '#^https?://#i', $url ) || isset( $seen[ $url ] ) ) continue;
                 $seen[ $url ] = true;
-                $alt = '';
-                if ( preg_match( '/\balt\s*=\s*([\'"])(.*?)\1/i', $tag[0], $a ) ) $alt = trim( html_entity_decode( $a[2], ENT_QUOTES ) );
-                $images[] = array( 'url' => $url, 'description' => $alt, 'is_primary' => false );
+                $primary = empty( $images );
+                $alt     = '';
+                if ( ! $primary && preg_match( '/\balt\s*=\s*([\'"])(.*?)\1/i', $tag[0], $a ) ) {
+                    $alt = self::alt_or_nothing( html_entity_decode( $a[2], ENT_QUOTES ), $url );
+                }
+                $images[] = array( 'url' => $url, 'description' => $alt, 'is_primary' => $primary );
             }
         }
         return $images;
+    }
+
+    /** The alt text, unless it is just the image's filename (WordPress pastes that in on upload). Pure: tested on its own. */
+    public static function alt_or_nothing( $alt, $url ) {
+        $alt = trim( (string) $alt );
+        if ( $alt === '' ) return '';
+        $file = strtolower( pathinfo( (string) wp_parse_url( $url, PHP_URL_PATH ), PATHINFO_FILENAME ) );
+        $norm = static function ( $s ) { return preg_replace( '/[^\p{L}\p{N}]+/u', ' ', mb_strtolower( $s, 'UTF-8' ) ); };
+        // "shape_3.png" or "shape_3" vs file shape_3.png, "LED" vs file LED-1024x513.png: the same words, so no words.
+        $words = trim( $norm( preg_replace( '/\.[a-z0-9]{2,5}$/i', '', $alt ) ) );
+        $stem  = preg_replace( '/-\d+x\d+$/', '', $file );
+        if ( $words === '' || $words === trim( $norm( $file ) ) || $words === trim( $norm( $stem ) ) ) return '';
+        return $alt;
     }
 }

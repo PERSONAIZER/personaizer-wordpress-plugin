@@ -21,3 +21,8 @@ function pz_fixture( string $name ): array {
     }
     return json_decode( file_get_contents( $path ), true, 512, JSON_THROW_ON_ERROR );
 }
+
+// The one WordPress function the pure content code reaches for: wp_parse_url is parse_url with saner failure.
+if ( ! function_exists( 'wp_parse_url' ) ) {
+    function wp_parse_url( $url, $component = -1 ) { return parse_url( (string) $url, $component ); }
+}
