@@ -4,7 +4,9 @@ namespace Personaizer\Sync;
 use Personaizer\Api\Contracts;
 use Personaizer\Options;
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /**
  * The one recurring tick. Everything hands-off rides it: the full-list check, releasing records the plan had no
@@ -14,30 +16,36 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 final class Daily {
 
-    const HOOK = 'personaizer_daily';
+	const HOOK = 'personaizer_daily';
 
-    public static function boot() {
-        add_action( self::HOOK, array( __CLASS__, 'run' ) );
-        if ( ! wp_next_scheduled( self::HOOK ) ) self::schedule();
-    }
+	public static function boot() {
+		add_action( self::HOOK, array( __CLASS__, 'run' ) );
+		if ( ! wp_next_scheduled( self::HOOK ) ) {
+			self::schedule();
+		}
+	}
 
-    public static function schedule() {
-        if ( ! wp_next_scheduled( self::HOOK ) ) {
-            wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
-        }
-    }
+	public static function schedule() {
+		if ( ! wp_next_scheduled( self::HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
+		}
+	}
 
-    public static function unschedule() {
-        wp_clear_scheduled_hook( self::HOOK );
-    }
+	public static function unschedule() {
+		wp_clear_scheduled_hook( self::HOOK );
+	}
 
-    public static function run() {
-        if ( ! Options::is_connected() ) return;
-        $state = State::get( true );
-        // Records the plan had no room for go again only when the plan says it has room — not on every tick.
-        if ( $state !== null && Contracts::has_headroom( $state ) ) Outbox::release( Outbox::DEFERRED );
-        Outbox::release( Outbox::FAILED );
-        Reconcile::start();
-        Worker::arm();
-    }
+	public static function run() {
+		if ( ! Options::is_connected() ) {
+			return;
+		}
+		$state = State::get( true );
+		// Records the plan had no room for go again only when the plan says it has room — not on every tick.
+		if ( $state !== null && Contracts::has_headroom( $state ) ) {
+			Outbox::release( Outbox::DEFERRED );
+		}
+		Outbox::release( Outbox::FAILED );
+		Reconcile::start();
+		Worker::arm();
+	}
 }

@@ -16,17 +16,23 @@ namespace Personaizer\Content;
  */
 final class Fingerprint {
 
-    /** md5 of the canonical payload. Not a security hash — a cheap, stable equality check. */
-    public static function of( array $payload ) {
-        return md5( (string) json_encode( self::normalize( $payload ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
-    }
+	/** md5 of the canonical payload. Not a security hash — a cheap, stable equality check. */
+	public static function of( array $payload ) {
+		return md5( (string) json_encode( self::normalize( $payload ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	}
 
-    private static function normalize( $value ) {
-        if ( ! is_array( $value ) ) return $value;
-        $is_list = empty( $value ) || array_keys( $value ) === range( 0, count( $value ) - 1 );
-        $out     = array();
-        foreach ( $value as $k => $v ) $out[ $k ] = self::normalize( $v );
-        if ( ! $is_list ) ksort( $out );
-        return $out;
-    }
+	private static function normalize( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+		$is_list = empty( $value ) || array_keys( $value ) === range( 0, count( $value ) - 1 );
+		$out     = array();
+		foreach ( $value as $k => $v ) {
+			$out[ $k ] = self::normalize( $v );
+		}
+		if ( ! $is_list ) {
+			ksort( $out );
+		}
+		return $out;
+	}
 }

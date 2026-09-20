@@ -12,7 +12,9 @@ use Personaizer\Sync\Worker;
 use Personaizer\Widget\Embed;
 use Personaizer\Widget\IdentityToken;
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /**
  * Wires the plugin together. Nothing here does work: every part registers its hooks and waits.
@@ -26,32 +28,32 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 final class Plugin {
 
-    public static function boot() {
-        Flow::boot();
-        Hooks::boot();
-        Worker::boot();
-        Backfill::boot();
-        Reconcile::boot();
-        Daily::boot();
-        Page::boot();
-        Embed::boot();
-        IdentityToken::boot();
-        // The self-hosted update channel ships in prod zips only (build-zip.sh strips it for --dev and --org).
-        if ( is_file( PERSONAIZER_PLUGIN_DIR . '/src/Updater.php' ) ) {
-            Updater::boot();
-        }
-    }
+	public static function boot() {
+		Flow::boot();
+		Hooks::boot();
+		Worker::boot();
+		Backfill::boot();
+		Reconcile::boot();
+		Daily::boot();
+		Page::boot();
+		Embed::boot();
+		IdentityToken::boot();
+		// The self-hosted update channel ships in prod zips only (build-zip.sh strips it for --dev and --org).
+		if ( is_file( PERSONAIZER_PLUGIN_DIR . '/src/Updater.php' ) ) {
+			Updater::boot();
+		}
+	}
 
-    public static function activate() {
-        Outbox::install();
-        Daily::schedule();
-    }
+	public static function activate() {
+		Outbox::install();
+		Daily::schedule();
+	}
 
-    /** A deactivated plugin never keeps walking: every schedule goes; the connection and the outbox stay for reactivation. */
-    public static function deactivate() {
-        Daily::unschedule();
-        Worker::disarm();
-        Backfill::disarm();
-        Reconcile::disarm();
-    }
+	/** A deactivated plugin never keeps walking: every schedule goes; the connection and the outbox stay for reactivation. */
+	public static function deactivate() {
+		Daily::unschedule();
+		Worker::disarm();
+		Backfill::disarm();
+		Reconcile::disarm();
+	}
 }
