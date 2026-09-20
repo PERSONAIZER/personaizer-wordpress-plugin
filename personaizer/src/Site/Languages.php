@@ -48,8 +48,8 @@ final class Languages {
 		if ( ! defined( 'ICL_SITEPRESS_VERSION' ) ) {
 			return array();
 		}
-		$default = (string) apply_filters( 'wpml_default_language', null );
-		$active  = apply_filters( 'wpml_active_languages', null, array( 'skip_missing' => 0 ) );
+		$default = (string) apply_filters( 'wpml_default_language', null ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WPML's own filter
+		$active  = apply_filters( 'wpml_active_languages', null, array( 'skip_missing' => 0 ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WPML's own filter
 		$codes   = array();
 		if ( $default !== '' ) {
 			$codes[] = $default;

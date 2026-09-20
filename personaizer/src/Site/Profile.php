@@ -179,7 +179,7 @@ final class Profile {
 	}
 
 	private static function render( WP_Post $post ) {
-		$body  = Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) );
+		$body  = Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
 		$title = html_entity_decode( get_the_title( $post ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return $title !== '' ? "# {$title}\n\n{$body}" : $body;
 	}

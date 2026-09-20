@@ -42,7 +42,7 @@ final class PostPayload {
 		$record                = array(
 			'id'      => self::external_id( $post ),
 			'title'   => $title,
-			'content' => '# ' . $title . "\n\n" . Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ),
+			'content' => '# ' . $title . "\n\n" . Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
 			'links'   => array(
 				array(
 					'url'        => get_permalink( $post ),
@@ -89,7 +89,7 @@ final class PostPayload {
 			}
 		}
 
-		$html = (string) apply_filters( 'the_content', $post->post_content );
+		$html = (string) apply_filters( 'the_content', $post->post_content ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
 		if ( preg_match_all( '/<img\b[^>]*?\bsrc\s*=\s*([\'"])(.*?)\1[^>]*>/i', $html, $tags, PREG_SET_ORDER ) ) {
 			foreach ( $tags as $tag ) {
 				if ( count( $images ) >= self::MAX_IMAGES ) {

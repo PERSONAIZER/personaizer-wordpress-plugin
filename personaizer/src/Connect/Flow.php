@@ -100,6 +100,9 @@ final class Flow {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Not allowed.' );
 		}
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- this is the OAuth redirect back from
+		// personaizer.com: the `state` we minted in connect() and kept in a transient is the CSRF token, and a
+		// request that does not carry it is refused below.
 		$state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( $_GET['state'] ) ) : '';
 		$code  = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : '';
 		$error = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( $_GET['error'] ) ) : '';
@@ -183,6 +186,7 @@ final class Flow {
 	}
 
 	private static function b64url( $bytes ) {
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- PKCE base64url of random bytes
 		return rtrim( strtr( base64_encode( $bytes ), '+/', '-_' ), '=' );
 	}
 }

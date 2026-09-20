@@ -75,7 +75,7 @@ final class ProductPayload {
 	private static function description( WC_Product $product ) {
 		$parts = array();
 		foreach ( array( $product->get_short_description(), $product->get_description() ) as $html ) {
-			$text = Markdown::from_html( (string) apply_filters( 'the_content', (string) $html ) );
+			$text = Markdown::from_html( (string) apply_filters( 'the_content', (string) $html ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
 			if ( $text !== '' ) {
 				$parts[] = $text;
 			}

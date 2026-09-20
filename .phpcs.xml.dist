@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<ruleset name="PERSONAIZER plugin">
+	<description>What the wordpress.org reviewers run (Plugin Check wraps these sniffs), minus style rules that fight the plugin's PSR-4 layout.</description>
+
+	<file>personaizer</file>
+	<!-- The self-hosted updater never ships to wordpress.org (the org build strips it). -->
+	<exclude-pattern>personaizer/src/Updater.php</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+
+	<rule ref="WordPress-Extra">
+		<!-- Classes live in src/Namespace/Class.php (PSR-4 through the plugin's own autoloader), not class-*.php. -->
+		<exclude name="WordPress.Files.FileName"/>
+		<!-- Yoda is a preference, not a safety rule; the reviewers do not reject on it. -->
+		<exclude name="WordPress.PHP.YodaConditions"/>
+		<!-- Properties are read off decoded API JSON (external_id, last_error…) and WordPress objects (post_title). -->
+		<exclude name="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase"/>
+		<!-- $a ?: $b for defaults. -->
+		<exclude name="Universal.Operators.DisallowShortTernary"/>
+		<!-- $class / $list read as what they are; the parameters are never used as keywords. -->
+		<exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames"/>
+		<!-- WordPress hook callbacks take the arguments the hook passes, used or not. -->
+		<exclude name="Generic.CodeAnalysis.UnusedFunctionParameter"/>
+	</rule>
+
+	<!-- Every option, hook, transient and table this plugin creates is prefixed. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="personaizer"/>
+				<element value="Personaizer"/>
+				<element value="PERSONAIZER"/>
+			</property>
+		</properties>
+	</rule>
+	<!-- The view is include()d from Admin\Page::render(), so its variables are that function's locals, not globals. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+		<exclude-pattern>personaizer/src/Admin/views/*</exclude-pattern>
+	</rule>
+
+	<config name="minimum_supported_wp_version" value="5.6"/>
+	<config name="testVersion" value="7.4-"/>
+</ruleset>

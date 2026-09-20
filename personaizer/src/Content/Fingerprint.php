@@ -18,6 +18,7 @@ final class Fingerprint {
 
 	/** md5 of the canonical payload. Not a security hash — a cheap, stable equality check. */
 	public static function of( array $payload ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- a checksum input, not output; plain PHP so the tests run without WordPress
 		return md5( (string) json_encode( self::normalize( $payload ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 	}
 

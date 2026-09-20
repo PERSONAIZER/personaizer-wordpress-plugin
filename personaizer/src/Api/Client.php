@@ -214,6 +214,18 @@ final class Client {
 		return is_wp_error( $result ) && self::code( $result ) === Contracts::CLOSED;
 	}
 
+	/**
+	 * The site's credential no longer opens anything: the integration was deleted on personaizer.com, or its key
+	 * revoked (401/403/404). The opposite of an outage — waiting will not bring it back.
+	 */
+	public static function is_gone( $result ) {
+		if ( ! is_wp_error( $result ) ) {
+			return false;
+		}
+		$data = $result->get_error_data();
+		return is_array( $data ) && in_array( (int) ( $data['status'] ?? 0 ), array( 401, 403, 404 ), true );
+	}
+
 	public static function is_quota( $result ) {
 		if ( ! is_wp_error( $result ) ) {
 			return false;

@@ -60,7 +60,7 @@ The plugin does **not** process payments, and chat conversations are not stored 
 This plugin connects to PERSONAIZER, a third-party AI chat service, to load and run the chat widget. This connection is required for the plugin to function.
 
 **1. Chat widget script (PERSONAIZER CDN)**
-The plugin loads the widget script `chat.js` from the PERSONAIZER content delivery network (`https://personaizerprodstore.blob.core.windows.net`). It is loaded on every front-end page where the widget is enabled, using the public Persona ID you configure.
+The plugin loads the widget script `chat.js` from the PERSONAIZER content delivery network (`https://personaizerprodstore.blob.core.windows.net`). It is loaded on every front-end page once a persona was chosen at Connect, using that persona's public ID.
 
 **2. PERSONAIZER Chat API (`https://api.personaizer.com`)**
 Once loaded, the widget communicates with the PERSONAIZER API to power the conversation. When a visitor interacts with the chat, the following is sent to PERSONAIZER:
@@ -87,17 +87,16 @@ Your use of PERSONAIZER is governed by:
 
 == Installation ==
 
-1. Download the plugin zip (`personaizer-<version>.zip`).
-2. In your WordPress admin, go to **Plugins → Add New → Upload Plugin**, choose the zip, click **Install Now**, then **Activate**.
-3. Open the **PERSONAIZER** menu in your admin sidebar and click **Connect**.
-4. Approve your site on the PERSONAIZER consent screen: pick the brand it belongs to, the persona to use, and tick what it may learn from.
-5. You are returned to WordPress connected — visit your site and the chat widget is live.
+1. In your WordPress admin, go to **Plugins → Add New**, search for **PERSONAIZER**, click **Install Now**, then **Activate**. (Installing from a zip works the same way through **Upload Plugin**.)
+2. Open the **PERSONAIZER** menu in your admin sidebar and click **Connect**.
+3. Approve your site on the PERSONAIZER consent screen: pick the brand it belongs to, the persona to use, and tick what it may learn from.
+4. You land on your brand's knowledge map on personaizer.com, where the sync is already under way — visit your site and the chat widget is live.
 
 You will need a PERSONAIZER account. A free persona is enough to get started.
 
 = Updating =
 
-Download the newer zip and upload it the same way (**Plugins → Add New → Upload Plugin**); WordPress will ask you to confirm replacing the current version. Your connection is preserved across an update.
+Updates arrive through WordPress like any other plugin's; your connection is preserved across an update.
 
 **Updating from 1.x or 2.x to 3.0:** connect your site once more (the PERSONAIZER page in your admin asks you to). Version 3.0 talks to a new sync API, so the site has to be approved again. Your persona, its knowledge and the widget are untouched.
 
@@ -142,6 +141,7 @@ Use **Disconnect** to clear every credential and setting the plugin stored, whil
 * Hidden and private WooCommerce products are no longer sent.
 * The admin page is a status page: what you are connected as, whether the persona is ready, and per stream how much is synced, waiting, or refused — plus Sync now and Disconnect. Everything else is a link to personaizer.com.
 * Talks to the four-call sync API introduced with this release. The plugin's readers are tested against the API's own recorded responses, so the two cannot drift apart unnoticed again.
+* A site whose connection was removed on personaizer.com says so and offers to connect again, instead of showing its last known state as if nothing had happened.
 * **You must connect your site again after this update.** Nothing on personaizer.com is lost.
 = 2.1.1 =
 * Wording follows the account model: the Identity Secret that signs customer-recognition tokens is your account's, shared by every persona you embed, so rotating it on personaizer.com rotates it for this site too.

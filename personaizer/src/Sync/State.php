@@ -2,6 +2,7 @@
 namespace Personaizer\Sync;
 
 use Personaizer\Api\Client;
+use Personaizer\Api\Contracts;
 use Personaizer\Options;
 use Personaizer\Site\Streams;
 
@@ -14,8 +15,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * the persona, the plan. Read before every push (cached a minute), refreshed after anything that could change it
  * (a connect, a closed door), and backed by the last good answer when the API is unreachable. This is the ONLY
  * source of truth for which streams sync: the owner switches them on personaizer.com, never here.
+ *
+ * `status` is the server's `active` / `disconnected`, plus one of our own: `gone` — the key was refused outright
+ * (the integration was deleted on personaizer.com), which the last good answer must not stand in for. An
+ * outage keeps showing yesterday's state; a deleted integration shows "connect again".
  */
 final class State {
+
+	const GONE = 'gone';
 
 	const TTL       = MINUTE_IN_SECONDS;
 	const TRANSIENT = 'personaizer_sync_state';
@@ -36,7 +43,9 @@ final class State {
 			}
 		}
 		$live = Client::sync( Streams::inventory() );
-		if ( is_wp_error( $live ) ) {
+		if ( Client::is_gone( $live ) ) {
+			$live = Contracts::sync_response( array( 'status' => self::GONE ) );
+		} elseif ( is_wp_error( $live ) ) {
 			$fallback = get_option( Options::STATE_FALLBACK );
 			return is_array( $fallback ) ? $fallback : null;
 		}

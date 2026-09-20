@@ -7,9 +7,24 @@
  * shows "connected" without a manual refresh. (The new tab ends on this page too — the callback lands here.)
  */
 ( function () {
+    // The notice flags (?pz_connected=1 …) are for the page they land on. Every reload below re-requests the same
+    // URL, so drop them now or the one-line notice outlives what it announced.
+    if ( window.history && window.history.replaceState && /[?&]pz_/.test( location.search ) ) {
+        var params = new URLSearchParams( location.search );
+        Array.from( params.keys() ).forEach( function ( k ) { if ( k.indexOf( 'pz_' ) === 0 ) params.delete( k ); } );
+        window.history.replaceState( null, '', location.pathname + '?' + params.toString() + location.hash );
+    }
+
     if ( window.PersonaizerAdminPage && window.PersonaizerAdminPage.autoReload ) {
         setTimeout( function () { location.reload(); }, 6000 );
     }
+
+    // Disconnect asks first. The question sits on the button (data-pz-confirm) so the markup stays free of inline handlers.
+    document.querySelectorAll( '[data-pz-confirm]' ).forEach( function ( el ) {
+        el.addEventListener( 'click', function ( e ) {
+            if ( ! window.confirm( el.getAttribute( 'data-pz-confirm' ) ) ) e.preventDefault();
+        } );
+    } );
 
     var connect = document.querySelector( '[data-pz-connect]' );
     if ( ! connect ) return;

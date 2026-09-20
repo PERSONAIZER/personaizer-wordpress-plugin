@@ -20,10 +20,12 @@ jobs:
         run: find personaizer -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Unit tests against the API's recorded exchanges
         run: phpunit
+      # The ruleset is .phpcs.xml.dist: the sniffs Plugin Check runs on a wordpress.org submission. A finding here is
+      # a finding the reviewer will make, so it fails the build.
       - name: Coding standards (WordPress)
         run: |
           composer global require --quiet wp-coding-standards/wpcs dealerdirect/phpcodesniffer-composer-installer
-          phpcs --standard=WordPress --extensions=php --ignore=personaizer/src/Updater.php personaizer/src || true
+          phpcs
       - name: Static analysis
         run: |
           composer global require --quiet php-stubs/wordpress-stubs php-stubs/woocommerce-stubs

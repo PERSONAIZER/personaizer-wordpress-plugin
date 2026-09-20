@@ -82,6 +82,7 @@ final class IdentityToken {
 	/** Minimal HS256 JWT. The key is the identity secret verbatim — the server verifies with the UTF-8 bytes of the same string. */
 	public static function sign( array $payload, $secret ) {
 		$b64url  = static function ( $data ) {
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- JWT base64url segments
 			return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
 		};
 		$header  = $b64url(
