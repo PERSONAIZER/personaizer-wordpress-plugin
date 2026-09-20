@@ -2,7 +2,7 @@
 namespace Personaizer\Content;
 
 /**
- * Rendered WordPress HTML → readable markdown. Headings, paragraphs, lists, links, emphasis and tables survive;
+ * Rendered WordPress HTML → readable markdown. Headings, paragraphs, lists, links and tables survive (emphasis does not);
  * everything else (scripts, styles, forms, images, layout wrappers) is dropped. The result is what a page IS to a
  * reader, which is what the persona should learn — stripping every tag (what 2.x did) lost the structure that
  * tells "Delivery" from "Returns" on a policy page.
@@ -106,13 +106,10 @@ final class Markdown {
                     $text = self::collapse( self::inline( $child ) );
                     $out .= $text === '' ? '' : ( preg_match( '#^https?://#i', $href ) ? "[{$text}]({$href})" : $text );
                     break;
-                case 'strong': case 'b':
-                    $text = self::collapse( self::inline( $child ) );
-                    $out .= $text === '' ? '' : "**{$text}**";
-                    break;
-                case 'em': case 'i':
-                    $text = self::collapse( self::inline( $child ) );
-                    $out .= $text === '' ? '' : "*{$text}*";
+                case 'strong': case 'b': case 'em': case 'i':
+                    // Emphasis carries no meaning for a reader that is a model, and shows as noise wherever the
+                    // text is displayed; the words stay, the markers do not.
+                    $out .= self::inline( $child );
                     break;
                 case 'code':
                     $out .= '`' . trim( $child->textContent ) . '`';

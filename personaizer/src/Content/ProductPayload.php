@@ -58,10 +58,20 @@ final class ProductPayload {
         return $record;
     }
 
+    /**
+     * The short description first, then the long one. On a WooCommerce product page the short description is the
+     * block beside the price — where shops put the specs a buyer asks about (thickness, size, price per m²) — and
+     * the long description is the "Description" tab below. Both are what the product IS; 2.x sent only one of them.
+     */
     private static function description( WC_Product $product ) {
-        $text = $product->get_description();
-        if ( $text === '' ) $text = $product->get_short_description();
-        return Markdown::from_html( (string) apply_filters( 'the_content', $text ) );
+        $parts = array();
+        foreach ( array( $product->get_short_description(), $product->get_description() ) as $html ) {
+            $text = Markdown::from_html( (string) apply_filters( 'the_content', (string) $html ) );
+            if ( $text !== '' ) $parts[] = $text;
+        }
+        return implode( "
+
+", $parts );
     }
 
     /**

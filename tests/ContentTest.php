@@ -12,8 +12,8 @@ final class ContentTest extends TestCase {
               . '<script>alert(1)</script><style>.x{}</style><img src="https://x/y.jpg" alt="ignored">'
               . '<table><tr><th>Zone</th><th>Price</th></tr><tr><td>A</td><td>5 GEL</td></tr></table>'
               . '<p>It&#8217;s &amp; done</p></div>';
-        $expected = "## Delivery\n\nWe ship **daily**, see [the FAQ](https://shop.example.com/faq).\n\n"
-                  . "- Tbilisi: *same day*\n- Regions: 2 days\n  - Islands: 4\n\n"
+        $expected = "## Delivery\n\nWe ship daily, see [the FAQ](https://shop.example.com/faq).\n\n"
+                  . "- Tbilisi: same day\n- Regions: 2 days\n  - Islands: 4\n\n"
                   . "| Zone | Price |\n| --- | --- |\n| A | 5 GEL |\n\nIt’s & done";
         $this->assertSame( $expected, Markdown::from_html( $html ) );
     }
