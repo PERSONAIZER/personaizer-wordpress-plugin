@@ -138,6 +138,7 @@ final class Flow {
 		// A fresh connection: forget what the previous one was doing, learn what is on now, queue everything.
 		State::forget();
 		Outbox::clear();
+		Reconcile::forget();
 		State::get( true );
 		Backfill::start();
 

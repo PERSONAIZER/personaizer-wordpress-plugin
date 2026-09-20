@@ -95,9 +95,11 @@ foreach ( $model['streams'] as $stream ) {
 						</p>
 					<?php endif; ?>
 				</div>
+				<?php if ( $sync_status !== State::GONE ) : ?>
 				<div class="pz-hero__actions">
 					<a class="button button-primary" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Open in PERSONAIZER</a>
 				</div>
+				<?php endif; ?>
 			</div>
 			<?php if ( $sync_status === State::GONE ) : ?>
 				<div class="notice notice-warning inline"><p>This site's connection was removed on personaizer.com, so nothing syncs and the widget is off. <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>" data-pz-connect target="_blank">Connect</a> again to start over, or <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Clear this site's PERSONAIZER connection? Nothing on personaizer.com is touched.">clear the connection</a> here.</p></div>
@@ -114,7 +116,9 @@ foreach ( $model['streams'] as $stream ) {
 
 		<div class="pz-card">
 			<h2>What it learns from this site</h2>
+			<?php if ( $sync_status !== State::GONE ) : ?>
 			<p class="pz-muted">Switch streams on and off on <a href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>. New and edited content keeps syncing by itself.</p>
+			<?php endif; ?>
 			<table class="widefat striped pz-streams">
 				<thead><tr><th>Stream</th><th>Status</th><th>Synced</th><th>Waiting</th><th>Last check</th></tr></thead>
 				<tbody>
@@ -229,7 +233,9 @@ elseif ( $q['queued'] ) :
 				</details>
 			<?php endif; ?>
 			<p class="pz-actions">
+				<?php if ( $sync_status !== State::GONE ) : ?>
 				<a class="button" href="<?php echo esc_url( Page::action_url( Flow::ACTION_SYNC_NOW ) ); ?>">Sync now</a>
+				<?php endif; ?>
 				<a class="button pz-danger" href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Disconnect this site? The widget and syncing stop. Nothing is deleted on PERSONAIZER; connecting again resumes where you left off.">Disconnect</a>
 			</p>
 		</div>

@@ -233,6 +233,12 @@ final class Reconcile {
 		update_option( Options::RECONCILE_LAST, $all, false );
 	}
 
+	/** The outcomes belong to a connection: a new one starts with none. */
+	public static function forget() {
+		delete_option( Options::RECONCILE_LAST );
+		delete_option( Options::RECONCILE );
+	}
+
 	/** @return array<string,array> the last outcome per stream, for the admin page. */
 	public static function outcomes() {
 		$all = get_option( Options::RECONCILE_LAST, array() );

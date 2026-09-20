@@ -177,6 +177,8 @@ final class Worker {
 
 		if ( count( $result['written'] ) > 0 ) {
 			Options::clear_error();
+			// The synced counts the page shows come from the cached sync answer — it is out of date now.
+			State::forget();
 		}
 		return count( $result['written'] );
 	}
