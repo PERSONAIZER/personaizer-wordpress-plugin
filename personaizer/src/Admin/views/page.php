@@ -15,8 +15,13 @@ $state    = $m['state'];
 $persona  = $state['persona'] ?? null;
 $plan     = $state['plan'] ?? null;
 $status   = $state['status'] ?? '';
-$queued   = 0; $deferred = 0; $failed = 0;
-foreach ( $m['streams'] as $s ) { $queued += $s['queue']['queued']; $deferred += $s['queue']['deferred']; $failed += $s['queue']['failed']; }
+// Rows of a stream that is off are not being sent — they wait for the owner to switch it on. Count them apart.
+$queued = 0; $parked = 0; $deferred = 0; $failed = 0;
+foreach ( $m['streams'] as $s ) {
+    if ( $s['enabled'] ) $queued += $s['queue']['queued']; else $parked += $s['queue']['queued'];
+    $deferred += $s['queue']['deferred'];
+    $failed   += $s['queue']['failed'];
+}
 ?>
 <div class="wrap pz-wrap">
     <h1 class="pz-title">PERSONAIZER
@@ -91,7 +96,7 @@ foreach ( $m['streams'] as $s ) { $queued += $s['queue']['queued']; $deferred +=
                         <td><?php if ( $s['synced'] !== null ) : ?><?php echo (int) $s['synced']; ?> of <?php echo (int) $s['local']; ?><?php if ( $s['ready'] !== null && $s['ready'] < $s['synced'] ) : ?> <span class="pz-muted">(<?php echo (int) $s['ready']; ?> ready)</span><?php endif; ?><?php else : ?>—<?php endif; ?></td>
                         <td>
                             <?php $q = $s['queue']; ?>
-                            <?php if ( $q['queued'] ) : ?><span class="pz-tag"><?php echo (int) $q['queued']; ?> queued</span><?php endif; ?>
+                            <?php if ( $q['queued'] && $s['enabled'] ) : ?><span class="pz-tag"><?php echo (int) $q['queued']; ?> queued</span><?php elseif ( $q['queued'] ) : ?><span class="pz-tag" title="Waiting for the stream to be switched on"><?php echo (int) $q['queued']; ?> waiting (off)</span><?php endif; ?>
                             <?php if ( $q['deferred'] ) : ?><span class="pz-tag pz-tag--warn"><?php echo (int) $q['deferred']; ?> plan full</span><?php endif; ?>
                             <?php if ( $q['failed'] ) : ?><span class="pz-tag pz-tag--err"><?php echo (int) $q['failed']; ?> failed</span><?php endif; ?>
                             <?php if ( ! $q['queued'] && ! $q['deferred'] && ! $q['failed'] ) : ?><span class="pz-muted">—</span><?php endif; ?>
@@ -142,7 +147,7 @@ foreach ( $m['streams'] as $s ) { $queued += $s['queue']['queued']; $deferred +=
                     'WordPress ' . get_bloginfo( 'version' ) . ' · PHP ' . PHP_VERSION . ( class_exists( 'WooCommerce' ) ? ' · WooCommerce ' . ( defined( 'WC_VERSION' ) ? WC_VERSION : '' ) : '' ),
                     'Integration ' . get_option( Options::INTEGRATION_ID, '' ) . ' · brand ' . get_option( Options::BRAND_ID, '' ) . ' · persona ' . Options::persona_id(),
                     'Status ' . $status . ' · reachable ' . ( $m['reachable'] ? 'yes' : 'no' ) . ' · WP-Cron ' . ( $m['cron_off'] ? 'disabled' : 'on' ),
-                    'Outbox queued ' . $queued . ' · plan full ' . $deferred . ' · failed ' . $failed,
+                    'Outbox queued ' . $queued . ' · waiting (stream off) ' . $parked . ' · plan full ' . $deferred . ' · failed ' . $failed,
                     $m['error'] ? 'Last error ' . $m['error']['message'] . ' (' . $m['error']['code'] . ', ' . Page::ago( (int) $m['error']['at'] ) . ')' : 'Last error none',
                 ) ) );
             ?></textarea>

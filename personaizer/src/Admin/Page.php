@@ -99,7 +99,9 @@ final class Page {
         $state = State::get();
         if ( $state !== null && $state['persona'] !== null && $state['persona']['building'] ) return true;
         if ( Backfill::progress()['running'] || Reconcile::progress()['running'] ) return true;
-        foreach ( Outbox::counts() as $c ) if ( $c['queued'] > 0 ) return true;
+        // Queued rows of a stream that is OFF are parked, not in flight — no reason to keep reloading for them.
+        $on = State::enabled_streams();
+        foreach ( Outbox::counts() as $stream => $c ) if ( $c['queued'] > 0 && isset( $on[ $stream ] ) ) return true;
         return false;
     }
 
