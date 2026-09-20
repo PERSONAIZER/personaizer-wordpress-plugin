@@ -2,7 +2,7 @@
 namespace Personaizer\Content;
 
 /**
- * Rendered WordPress HTML → readable markdown. Headings, paragraphs, lists, links and tables survive (emphasis does not);
+ * Rendered WordPress HTML → readable markdown. Headings, paragraphs, lists, links, emphasis, tables and definition lists survive;
  * everything else (scripts, styles, forms, images, layout wrappers) is dropped. The result is what a page IS to a
  * reader, which is what the persona should learn — stripping every tag (what 2.x did) lost the structure that
  * tells "Delivery" from "Returns" on a policy page.
@@ -71,6 +71,8 @@ final class Markdown {
                 return "\n\n```\n" . trim( $node->textContent ) . "\n```\n\n";
             case 'table':
                 return "\n\n" . self::table( $node ) . "\n\n";
+            case 'dl':
+                return "\n\n" . self::definitions( $node ) . "\n\n";
             case 'img': case 'picture': case 'figure':
                 // Images travel in the record's image library, not in the text. A figure's caption still counts.
                 $caption = '';
@@ -106,10 +108,13 @@ final class Markdown {
                     $text = self::collapse( self::inline( $child ) );
                     $out .= $text === '' ? '' : ( preg_match( '#^https?://#i', $href ) ? "[{$text}]({$href})" : $text );
                     break;
-                case 'strong': case 'b': case 'em': case 'i':
-                    // Emphasis carries no meaning for a reader that is a model, and shows as noise wherever the
-                    // text is displayed; the words stay, the markers do not.
-                    $out .= self::inline( $child );
+                case 'strong': case 'b':
+                    $text = self::collapse( self::inline( $child ) );
+                    $out .= $text === '' ? '' : "**{$text}**";
+                    break;
+                case 'em': case 'i':
+                    $text = self::collapse( self::inline( $child ) );
+                    $out .= $text === '' ? '' : "*{$text}*";
                     break;
                 case 'code':
                     $out .= '`' . trim( $child->textContent ) . '`';
@@ -145,6 +150,26 @@ final class Markdown {
             }
             $lines[] = $indent . $marker . self::collapse( self::inline_nodes( $own ) ) . $nested;
         }
+        return implode( "\n", $lines );
+    }
+
+    /** A definition list — the shape many themes use for a spec block — as "- term: definition" lines. */
+    private static function definitions( \DOMElement $list ) {
+        $lines = array();
+        $term  = null;
+        foreach ( $list->childNodes as $child ) {
+            if ( ! $child instanceof \DOMElement ) continue;
+            $tag = strtolower( $child->tagName );
+            if ( $tag === 'dt' ) {
+                if ( $term !== null ) $lines[] = '- ' . $term;
+                $term = self::collapse( self::inline( $child ) );
+            } elseif ( $tag === 'dd' ) {
+                $value   = self::collapse( self::inline( $child ) );
+                $lines[] = '- ' . ( $term !== null && $term !== '' ? $term . ': ' : '' ) . $value;
+                $term    = null;
+            }
+        }
+        if ( $term !== null ) $lines[] = '- ' . $term;
         return implode( "\n", $lines );
     }
 

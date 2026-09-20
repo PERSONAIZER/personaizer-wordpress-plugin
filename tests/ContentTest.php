@@ -11,10 +11,12 @@ final class ContentTest extends TestCase {
               . '<ul><li>Tbilisi: <em>same day</em></li><li>Regions: 2 days<ul><li>Islands: 4</li></ul></li></ul>'
               . '<script>alert(1)</script><style>.x{}</style><img src="https://x/y.jpg" alt="ignored">'
               . '<table><tr><th>Zone</th><th>Price</th></tr><tr><td>A</td><td>5 GEL</td></tr></table>'
+              . '<dl><dt>Thickness</dt><dd>3 mm</dd><dt>Size</dt><dd>1220 x 2440</dd></dl>'
               . '<p>It&#8217;s &amp; done</p></div>';
-        $expected = "## Delivery\n\nWe ship daily, see [the FAQ](https://shop.example.com/faq).\n\n"
-                  . "- Tbilisi: same day\n- Regions: 2 days\n  - Islands: 4\n\n"
-                  . "| Zone | Price |\n| --- | --- |\n| A | 5 GEL |\n\nIt’s & done";
+        $expected = "## Delivery\n\nWe ship **daily**, see [the FAQ](https://shop.example.com/faq).\n\n"
+                  . "- Tbilisi: *same day*\n- Regions: 2 days\n  - Islands: 4\n\n"
+                  . "| Zone | Price |\n| --- | --- |\n| A | 5 GEL |\n\n"
+                  . "- Thickness: 3 mm\n- Size: 1220 x 2440\n\nIt’s & done";
         $this->assertSame( $expected, Markdown::from_html( $html ) );
     }
 
