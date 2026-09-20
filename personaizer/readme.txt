@@ -140,7 +140,7 @@ Use **Disconnect** to clear every credential and setting the plugin stored, whil
 * Connect tells PERSONAIZER what your site is before you get there — name, logo, colours, every language your site publishes in (WPML, Polylang, TranslatePress) with the primary first, currency, and what you sell — so the brand form on the consent screen arrives filled in and the persona can be built right there, with no crawling.
 * Pages and posts are sent as real markdown (headings, lists, links, tables) instead of stripped text.
 * Hidden and private WooCommerce products are no longer sent.
-* The admin page is a status page: what you are connected as, whether the persona is ready, and per stream how much is synced, waiting, or refused — plus Sync now, Reconnect and Disconnect. Everything else is a link to personaizer.com.
+* The admin page is a status page: what you are connected as, whether the persona is ready, and per stream how much is synced, waiting, or refused — plus Sync now and Disconnect. Everything else is a link to personaizer.com.
 * Talks to the four-call sync API introduced with this release. The plugin's readers are tested against the API's own recorded responses, so the two cannot drift apart unnoticed again.
 * **You must connect your site again after this update.** Nothing on personaizer.com is lost.
 = 2.1.1 =

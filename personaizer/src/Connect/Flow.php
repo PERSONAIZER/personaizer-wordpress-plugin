@@ -24,7 +24,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *    (built for the brand right there, if there is none) and the streams, and approves.
  * 3. Callback: the browser comes back with a single-use code; this server redeems it with the PKCE verifier for
  *    the site's integration credential (ik_), the brand, the persona and the account's identity secret. Then the
- *    first sync and the backfill start. A reconnect is the same flow; PERSONAIZER resumes the same integration.
+ *    first sync and the backfill start. Connecting again after a Disconnect is the same flow; PERSONAIZER resumes
+ *    the same integration (same site origin) with its history.
  *
  * The verifier lives in a transient keyed by the `state` we sent, so the callback can't be replayed or forged.
  */

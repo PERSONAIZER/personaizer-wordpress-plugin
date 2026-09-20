@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * The one admin screen: what this site is connected as, whether the persona is ready, how each stream is doing,
- * and three buttons — Connect / Reconnect, Sync now, Disconnect. Nothing is configured here except whether
+ * and two buttons — Sync now and Disconnect (Connect when it is not connected). Nothing is configured here except whether
  * signed-in customers are recognised; every other setting (streams, persona, widget) is a link to personaizer.com.
  */
 final class Page {
@@ -108,7 +108,7 @@ final class Page {
     /** @return array{kind:string,text:string}|null the one-line result of the action that led here. */
     private static function notice() {
         if ( ! empty( $_GET['pz_connected'] ) )    return array( 'kind' => 'success', 'text' => 'Connected. Your content is being sent to PERSONAIZER now.' );
-        if ( ! empty( $_GET['pz_disconnected'] ) ) return array( 'kind' => 'info', 'text' => 'Disconnected. Nothing was deleted on PERSONAIZER; reconnect any time.' );
+        if ( ! empty( $_GET['pz_disconnected'] ) ) return array( 'kind' => 'info', 'text' => 'Disconnected. Nothing was deleted on PERSONAIZER; connect again any time to resume.' );
         if ( ! empty( $_GET['pz_syncing'] ) )      return array( 'kind' => 'info', 'text' => 'Syncing now — every stream is being checked against PERSONAIZER.' );
         if ( ! empty( $_GET['pz_error'] ) )        return array( 'kind' => 'error', 'text' => sanitize_text_field( wp_unslash( $_GET['pz_error'] ) ) );
         return null;

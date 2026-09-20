@@ -77,7 +77,7 @@ calls `POST /api/integrations/connect/start` with the site's profile (`Site\Prof
 `{APP_URL}/connect?c=<id>&state=<csrf>`. The owner picks brand, persona and streams there and approves; the browser
 returns to `admin-post.php?action=personaizer_connect_callback&code=…&state=…`; this server redeems the code with
 the verifier at `POST /api/integrations/connect/token` and stores the credential, brand, persona and identity
-secret. Then: first sync, outbox cleared, backfill. A reconnect is the same flow; the backend resumes the
+secret. Then: first sync, outbox cleared, backfill. Connecting again after a Disconnect is the same flow; the backend resumes the
 integration and the consent screen opens on what is true now.
 
 ## Two credentials

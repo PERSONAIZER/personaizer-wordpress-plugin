@@ -77,7 +77,7 @@ foreach ( $m['streams'] as $s ) {
                 </div>
             </div>
             <?php if ( $status === 'disconnected' ) : ?>
-                <div class="notice notice-warning inline"><p>This site was disconnected on personaizer.com. Nothing was deleted; <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">reconnect</a> to resume.</p></div>
+                <div class="notice notice-warning inline"><p>This site was disconnected on personaizer.com. Nothing was deleted; <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">connect</a> again to resume.</p></div>
             <?php elseif ( ! $m['reachable'] ) : ?>
                 <div class="notice notice-error inline"><p>PERSONAIZER can't be reached right now<?php if ( $m['error'] ) : ?>: <?php echo esc_html( $m['error']['message'] ); ?><?php endif; ?>. Changes are kept and sent when it's back.</p></div>
             <?php endif; ?>
@@ -125,8 +125,7 @@ foreach ( $m['streams'] as $s ) {
             <?php endif; ?>
             <p class="pz-actions">
                 <a class="button" href="<?php echo esc_url( Page::action_url( Flow::ACTION_SYNC_NOW ) ); ?>">Sync now</a>
-                <a class="button" href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">Reconnect</a>
-                <a class="button pz-danger" href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" onclick="return confirm('Disconnect this site? Nothing is deleted on PERSONAIZER; you can reconnect any time.');">Disconnect</a>
+                <a class="button pz-danger" href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" onclick="return confirm('Disconnect this site? The widget and syncing stop. Nothing is deleted on PERSONAIZER; connecting again resumes where you left off.');">Disconnect</a>
             </p>
         </div>
 
