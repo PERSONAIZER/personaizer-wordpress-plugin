@@ -116,6 +116,8 @@ final class Page {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		// The owner is watching: a pending backfill advances at the end of this request rather than on the next cron tick.
+		Backfill::run_soon();
 		$model = self::model();
 		include PERSONAIZER_PLUGIN_DIR . '/src/Admin/views/page.php';
 	}

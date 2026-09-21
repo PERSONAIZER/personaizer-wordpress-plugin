@@ -38,7 +38,7 @@ final class Profile {
 			'logo_url'           => self::logo_url(),
 			'accent_colors'      => self::accent_colors(),
 			'currency'           => self::currency(),
-			'description'        => self::nullable( (string) get_bloginfo( 'description' ) ),   // the tagline
+			'description'        => self::nullable( html_entity_decode( (string) get_bloginfo( 'description' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ),   // the tagline
 			'homepage_markdown'  => self::identity_material(),
 		);
 	}

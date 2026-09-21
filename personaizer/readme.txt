@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.3
+Stable tag: 3.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,10 @@ In WordPress it stores your integration key, brand and persona ids, your account
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 3.0.4 =
+* The first content sync starts the moment the site is connected: the backfill now queues its first page at the end of the connect request and of every plugin-page load while it is pending, instead of waiting for WP-Cron's next visitor. Cron remains the continuation for large catalogs.
+* The brand description handed to PERSONAIZER on connect is the tagline with HTML entities decoded, so quotes arrive as quotes.
 
 = 3.0.3 =
 * No code change: a code-standards annotation in the outbox was scoped so the wordpress.org Plugin Check report reads clean.

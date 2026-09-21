@@ -13,14 +13,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * "Sync everything that already exists." Hooks can't fire for content that was published before the site
  * connected, so once — after a connect, and on demand — every published record of every stream that is on is
- * enqueued. Enumeration alone: the outbox and the worker do the pushing. Walks in pages on WP-Cron with a small
- * cursor option, so a 50 000-product catalog never has to fit in one request.
+ * enqueued. Enumeration alone: the outbox and the worker do the pushing. Walks in pages with a small cursor option, so
+ * a 50 000-product catalog never has to fit in one request.
+ *
+ * The first page runs at the end of the request that started it (and of every admin page load while it is pending),
+ * after the response has been sent — the same path the worker uses. WP-Cron alone would wait for the next visitor,
+ * which on a quiet site is minutes: the owner would watch "queuing (0 so far)" for no reason. Cron stays the
+ * continuation for what a single request cannot finish. Enqueueing is idempotent, so the two never double-queue.
  */
 final class Backfill {
 
 	const HOOK           = 'personaizer_backfill';
 	const PAGE           = 500;
 	const BUDGET_SECONDS = 20;
+
+	private static $armed_for_shutdown = false;
 
 	public static function boot() {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
@@ -43,6 +50,23 @@ final class Backfill {
 			false
 		);
 		self::arm( 0 );
+		self::run_soon();
+	}
+
+	/** A page of the pending backfill at the end of this request, then the worker (its own shutdown hook runs after). */
+	public static function run_soon() {
+		if ( self::$armed_for_shutdown || ! self::progress()['running'] ) {
+			return;
+		}
+		self::$armed_for_shutdown = true;
+		add_action( 'shutdown', array( __CLASS__, 'run_at_shutdown' ), 4 );
+	}
+
+	public static function run_at_shutdown() {
+		if ( function_exists( 'fastcgi_finish_request' ) ) {
+			fastcgi_finish_request();
+		}
+		self::run();
 	}
 
 	public static function run() {
