@@ -62,7 +62,11 @@ trap 'rm -rf "$STAGE"' EXIT
 
 ZIP_PATH="$STAGE/$SLUG-$VERSION.zip"
 MANIFEST_PATH="$STAGE/$SLUG.json"
-[ -f "$ZIP_PATH" ] && [ -f "$MANIFEST_PATH" ] \
+# The wordpress.org package, from the same commit: the prod zip carries the self-hosted updater, which the
+# directory rejects outright — so the org zip is built here too, and only it is ever uploaded there.
+"$HERE/build-zip.sh" --org "$STAGE"
+ORG_ZIP_PATH="$STAGE/$SLUG-$VERSION-org.zip"
+[ -f "$ZIP_PATH" ] && [ -f "$MANIFEST_PATH" ] && [ -f "$ORG_ZIP_PATH" ] \
     || { echo "error: expected artifacts missing after build" >&2; exit 1; }
 
 # ── Notes: this version's readme changelog entry, unless one was supplied ──────
@@ -80,9 +84,10 @@ echo ""
 echo "Releasing $TAG"
 echo "  zip       $(basename "$ZIP_PATH")"
 echo "  manifest  $(basename "$MANIFEST_PATH")"
+echo "  org zip   $(basename "$ORG_ZIP_PATH")   <- the ONLY zip to upload to wordpress.org"
 echo ""
 
-gh release create "$TAG" "$ZIP_PATH" "$MANIFEST_PATH" \
+gh release create "$TAG" "$ZIP_PATH" "$MANIFEST_PATH" "$ORG_ZIP_PATH" \
     --title "PERSONAIZER $VERSION" \
     --notes-file "$NOTES_FILE"
 
