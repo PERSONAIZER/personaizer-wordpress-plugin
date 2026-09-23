@@ -142,9 +142,10 @@ final class Flow {
 		State::get( true );
 		Backfill::start();
 
-		// Land on the brand's knowledge map with the persona's chat open: the sync shows on the source cards there. The
-		// WP admin page (the tab Connect was clicked in) reloads to "connected" on its own.
-		wp_safe_redirect( self::dashboard_url() );
+		// Land on the brand's knowledge map: the sync shows on the source cards there. welcome=wordpress marks this as the
+		// arrival from a connect (the page's one-time hints and its analytics entry) — the permanent "Open in PERSONAIZER"
+		// button uses dashboard_url() without it. The WP admin page (the tab Connect was clicked in) reloads on its own.
+		wp_safe_redirect( add_query_arg( 'welcome', 'wordpress', self::dashboard_url() ) );
 		exit;
 	}
 
