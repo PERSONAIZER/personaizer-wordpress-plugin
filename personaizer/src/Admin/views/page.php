@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	$persona     = $state['persona'] ?? null;
 	$plan        = $state['plan'] ?? null;
 	$sync_status = $state['status'] ?? '';
+	// Null when the API can't be reached and no earlier answer is stored.
+	$brand_name = $state['brand']['name'] ?? '';
 	// Rows of a stream that is off are not being sent — they wait for the owner to switch it on. Count them apart.
 	$queued   = 0;
 	$parked   = 0;
@@ -73,15 +75,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<img src="<?php echo esc_url( $persona['avatar_url'] ); ?>" alt=""><?php endif; ?></div>
 				<?php endif; ?>
 				<div class="pz-hero__text">
-					<h2><?php echo $persona ? esc_html( $persona['name'] ) : esc_html( $state['brand']['name'] ?: 'Your brand' ); ?></h2>
+					<h2><?php echo $persona ? esc_html( $persona['name'] ) : esc_html( $brand_name ?: 'Your brand' ); ?></h2>
 					<?php if ( $persona && $persona['building'] ) : ?>
 						<p class="pz-muted"><span class="spinner is-active pz-spinner"></span> Being built — the widget shows a "coming soon" state until it's ready.</p>
 					<?php elseif ( $persona ) : ?>
-						<p class="pz-muted">Answering on this site for <strong><?php echo esc_html( $state['brand']['name'] ); ?></strong>.</p>
+						<p class="pz-muted">Answering on this site for <strong><?php echo esc_html( $brand_name ); ?></strong>.</p>
 					<?php elseif ( $sync_status === State::GONE ) : ?>
 						<p class="pz-muted">Nothing syncs and nothing is shown until this site is connected again.</p>
 					<?php else : ?>
-						<p class="pz-muted">Content syncs into <strong><?php echo esc_html( $state['brand']['name'] ?: 'your brand' ); ?></strong>; no chat widget is on the site yet — pick a persona on personaizer.com.</p>
+						<p class="pz-muted">Content syncs into <strong><?php echo esc_html( $brand_name ?: 'your brand' ); ?></strong>; no chat widget is on the site yet — pick a persona on personaizer.com.</p>
 					<?php endif; ?>
 					<?php if ( $plan && $plan['name'] !== '' ) : ?>
 						<p class="pz-muted pz-plan">
