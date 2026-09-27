@@ -28,7 +28,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Plugin {
 
+	/** The version this site last ran, so an update can do its one-time work once. */
+	const VERSION_OPTION = 'personaizer_version';
+
+	/** A second full-list check after an update that renamed records: the first adds them, the second (agreeing) removes the old. */
+	const RECHECK_HOOK = 'personaizer_recheck';
+
 	public static function boot() {
+		add_action( self::RECHECK_HOOK, array( Reconcile::class, 'start' ) );
+		self::upgrade();
 		Flow::boot();
 		Hooks::boot();
 		Worker::boot();
@@ -49,9 +57,30 @@ final class Plugin {
 		Daily::schedule();
 	}
 
+	/**
+	 * 3.1 names every record by its bare post ID (848, not wp-page-848), the id PERSONAIZER's onboarding also gives it,
+	 * so a site read before install is enriched in place. A connected site coming from an earlier version drops the
+	 * rows queued under the old ids and sends its full lists twice: the first puts every record under its new id, the
+	 * second agrees that the old ids are gone, and PERSONAIZER removes them.
+	 */
+	private static function upgrade() {
+		$was = (string) get_option( self::VERSION_OPTION, '' );
+		if ( $was === PERSONAIZER_VERSION ) {
+			return;
+		}
+		update_option( self::VERSION_OPTION, PERSONAIZER_VERSION, false );
+		if ( ( $was === '' || version_compare( $was, '3.1.0', '<' ) ) && Options::is_connected() ) {
+			Outbox::clear();
+			Reconcile::forget();
+			Reconcile::start();
+			wp_schedule_single_event( time() + 30 * MINUTE_IN_SECONDS, self::RECHECK_HOOK );
+		}
+	}
+
 	/** A deactivated plugin never keeps walking: every schedule goes; the connection and the outbox stay for reactivation. */
 	public static function deactivate() {
 		Daily::unschedule();
+		wp_clear_scheduled_hook( self::RECHECK_HOOK );
 		Worker::disarm();
 		Backfill::disarm();
 		Reconcile::disarm();

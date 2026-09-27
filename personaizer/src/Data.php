@@ -35,7 +35,9 @@ final class Data {
 	public static function purge() {
 		self::clear();
 		Outbox::drop();
+		delete_option( Plugin::VERSION_OPTION );
 		wp_clear_scheduled_hook( 'personaizer_daily' );
+		wp_clear_scheduled_hook( Plugin::RECHECK_HOOK );
 	}
 
 	private static function clear_transients() {

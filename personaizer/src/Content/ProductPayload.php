@@ -20,13 +20,13 @@ final class ProductPayload {
 
 	const MAX_IMAGES = 15;
 
-	/** `wc-product-<ID>` — the site's stable record id. */
+	/** The product's post ID — the site's stable record id, the same one its public API shows. */
 	public static function external_id( $product_id ) {
-		return 'wc-product-' . (int) $product_id;
+		return (string) (int) $product_id;
 	}
 
 	public static function product_id_of( $external_id ) {
-		return preg_match( '/^wc-product-(\d+)$/', (string) $external_id, $m ) ? (int) $m[1] : null;
+		return ctype_digit( (string) $external_id ) ? (int) $external_id : null;
 	}
 
 	/** Only a published product the shop shows belongs in the catalog: a hidden or private one is removed. */

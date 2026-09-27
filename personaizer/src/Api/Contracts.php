@@ -103,7 +103,7 @@ final class Contracts {
 
 	// ── items ──
 
-	/** @return array{written:string[],deferred:string[],rejected:array<string,array{code:string,message:string}>,deleted:int,deletes_busy:bool} */
+	/** @return array{written:string[],deferred:string[],rejected:array<int|string,array{code:string,message:string}>,deleted:int,deletes_busy:bool} */
 	public static function items_response( array $body ) {
 		$rejected = array();
 		foreach ( (array) ( $body['rejected'] ?? array() ) as $row ) {

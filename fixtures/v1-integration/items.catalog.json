@@ -2,7 +2,7 @@
   "request": {
     "upserts": [
       {
-        "id": "wc-product-88",
+        "id": "88",
         "fingerprint": "9f86d081884c7d659a2feaa0c55ad015",
         "title": "Merino Wool Sweater",
         "description": "Lightweight merino, knitted in Tbilisi.",
@@ -65,7 +65,7 @@
         ]
       },
       {
-        "id": "wc-product-89",
+        "id": "89",
         "fingerprint": "e2c569be17396eca2a2e3c11578123ed",
         "title": "A page in disguise",
         "content": "# Not a product"
@@ -76,12 +76,12 @@
   "status": 200,
   "response": {
     "written": [
-      "wc-product-88"
+      "88"
     ],
     "deferred": [],
     "rejected": [
       {
-        "id": "wc-product-89",
+        "id": "89",
         "code": "knowledge.source_type_mismatch",
         "message": "This stream holds a catalog: send typed fields, not content."
       }

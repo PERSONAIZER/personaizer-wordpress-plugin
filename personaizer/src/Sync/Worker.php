@@ -5,6 +5,7 @@ use Personaizer\Api\Client;
 use Personaizer\Api\Contracts;
 use Personaizer\Content\PostPayload;
 use Personaizer\Content\ProductPayload;
+use Personaizer\Content\StoreFacts;
 use Personaizer\Options;
 use Personaizer\Site\Streams;
 
@@ -109,7 +110,7 @@ final class Worker {
 		$row_by_id = array();
 		foreach ( $rows as $row ) {
 			$row_by_id[ $row->external_id ] = $row;
-			$record                         = $row->op === Outbox::UPSERT ? self::record( $type, $row ) : null;
+			$record                         = $row->op === Outbox::UPSERT ? self::record( $stream, $type, $row ) : null;
 			if ( $record === null ) {
 				$deletes[] = $row->external_id;     // unpublished, hidden, trashed, gone — or an explicit delete
 			} else {
@@ -187,7 +188,10 @@ final class Worker {
 	 * The record for a row, from the live post — or null when the record no longer belongs to the AI (unpublished,
 	 * hidden, trashed, deleted), which turns the row into a delete.
 	 */
-	private static function record( $type, $row ) {
+	private static function record( $stream, $type, $row ) {
+		if ( $stream === StoreFacts::STREAM ) {
+			return StoreFacts::record( $row->external_id );
+		}
 		if ( $type === Streams::CATALOG ) {
 			$product_id = $row->post_id ?: ProductPayload::product_id_of( $row->external_id );
 			$product    = $product_id && Streams::has_woocommerce() ? wc_get_product( $product_id ) : null;

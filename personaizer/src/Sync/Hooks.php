@@ -3,6 +3,7 @@ namespace Personaizer\Sync;
 
 use Personaizer\Content\PostPayload;
 use Personaizer\Content\ProductPayload;
+use Personaizer\Content\StoreFacts;
 use Personaizer\Options;
 use Personaizer\Site\Streams;
 use WP_Post;
@@ -18,7 +19,38 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Hooks {
 
+	/** The settings `store-facts.md` is written from: a change to any of them re-pushes it. */
+	const STORE_SETTINGS = array(
+		'blogname',
+		'blogdescription',
+		'timezone_string',
+		'wp_page_for_privacy_policy',
+		'woocommerce_currency',
+		'woocommerce_store_address',
+		'woocommerce_store_address_2',
+		'woocommerce_store_city',
+		'woocommerce_store_postcode',
+		'woocommerce_default_country',
+		'woocommerce_allowed_countries',
+		'woocommerce_specific_allowed_countries',
+		'woocommerce_all_except_countries',
+		'woocommerce_ship_to_countries',
+		'woocommerce_specific_ship_to_countries',
+		'woocommerce_calc_taxes',
+		'woocommerce_prices_include_tax',
+		'woocommerce_weight_unit',
+		'woocommerce_dimension_unit',
+		'woocommerce_terms_page_id',
+	);
+
 	public static function boot() {
+		foreach ( self::STORE_SETTINGS as $option ) {
+			add_action( "update_option_{$option}", array( __CLASS__, 'on_store_settings_changed' ), 20, 0 );
+		}
+		foreach ( array( 'created_product_cat', 'edited_product_cat', 'delete_product_cat' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'on_categories_changed' ), 20, 0 );
+		}
+
 		// meta + terms are final on wp_after_insert_post (unlike save_post).
 		add_action( 'wp_after_insert_post', array( __CLASS__, 'on_post_saved' ), 20, 4 );
 		add_action( 'trashed_post', array( __CLASS__, 'on_post_removed' ), 10, 1 );
@@ -84,6 +116,21 @@ final class Hooks {
 	public static function on_product_object( $product ) {
 		if ( is_object( $product ) && method_exists( $product, 'get_id' ) ) {
 			self::on_product_changed( $product->get_id() );
+		}
+	}
+
+	public static function on_store_settings_changed() {
+		if ( Options::is_connected() ) {
+			Outbox::enqueue_upsert( StoreFacts::STREAM, StoreFacts::FACTS_ID, 0 );
+			Worker::arm();
+		}
+	}
+
+	/** The category tree changed: `categories.md` is re-pushed (or removed, when no category is left). */
+	public static function on_categories_changed() {
+		if ( Options::is_connected() ) {
+			Outbox::enqueue_upsert( StoreFacts::STREAM, StoreFacts::CATEGORIES_ID, 0 );
+			Worker::arm();
 		}
 	}
 

@@ -1,8 +1,7 @@
 <?php
 namespace Personaizer\Sync;
 
-use Personaizer\Content\PostPayload;
-use Personaizer\Content\ProductPayload;
+use Personaizer\Content\StoreFacts;
 use Personaizer\Options;
 use Personaizer\Site\Streams;
 
@@ -109,6 +108,17 @@ final class Backfill {
 		if ( ! isset( $all[ $stream ] ) ) {
 			return array();
 		}
+		if ( $stream === StoreFacts::STREAM ) {
+			return $offset > 0 ? array() : array_map(
+				static function ( $id ) {
+					return array(
+						'external_id' => $id,
+						'post_id'     => 0,
+					);
+				},
+				StoreFacts::ids()
+			);
+		}
 		$ids  = get_posts(
 			array(
 				'post_type'      => $all[ $stream ]['post_type'],
@@ -126,7 +136,7 @@ final class Backfill {
 		$rows = array();
 		foreach ( $ids as $id ) {
 			$rows[] = array(
-				'external_id' => $stream === 'products' ? ProductPayload::external_id( $id ) : 'wp-' . $all[ $stream ]['post_type'] . '-' . (int) $id,
+				'external_id' => (string) (int) $id,
 				'post_id'     => (int) $id,
 			);
 		}

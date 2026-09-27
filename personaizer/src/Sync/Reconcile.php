@@ -4,6 +4,7 @@ namespace Personaizer\Sync;
 use Personaizer\Api\Client;
 use Personaizer\Content\PostPayload;
 use Personaizer\Content\ProductPayload;
+use Personaizer\Content\StoreFacts;
 use Personaizer\Options;
 use Personaizer\Site\Streams;
 
@@ -121,6 +122,18 @@ final class Reconcile {
 			return array();
 		}
 		$items = array();
+		if ( $stream === StoreFacts::STREAM ) {
+			if ( $offset > 0 ) {
+				return array();
+			}
+			foreach ( StoreFacts::records() as $record ) {
+				$items[] = array(
+					'id'          => $record['id'],
+					'fingerprint' => $record['fingerprint'],
+				);
+			}
+			return $items;
+		}
 		if ( $stream === 'products' ) {
 			$products = wc_get_products(
 				array(
@@ -187,6 +200,13 @@ final class Reconcile {
 		}
 		$rows = array();
 		foreach ( array_merge( $result['missing'], $result['stale'] ) as $external_id ) {
+			if ( $stream === StoreFacts::STREAM ) {
+				$rows[] = array(
+					'external_id' => $external_id,
+					'post_id'     => 0,
+				);
+				continue;
+			}
 			$post_id = $stream === 'products' ? ProductPayload::product_id_of( $external_id ) : PostPayload::post_id_of( $external_id );
 			if ( $post_id ) {
 				$rows[] = array(
@@ -221,6 +241,9 @@ final class Reconcile {
 		}
 		if ( $stream === 'products' ) {
 			return Streams::has_woocommerce() && function_exists( 'wc_get_products' );
+		}
+		if ( $stream === StoreFacts::STREAM ) {
+			return true;
 		}
 		return post_type_exists( $all[ $stream ]['post_type'] );
 	}

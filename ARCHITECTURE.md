@@ -4,7 +4,7 @@ How this plugin is put together, for anyone picking it up cold.
 
 ## In one paragraph
 
-The site's pages, posts, products and public custom types are **streams**. Every change on the site drops a row
+The site's pages, posts, products, public custom types and its store facts are **streams**. Every change on the site drops a row
 into an **outbox** table; one **worker** drains the outbox to PERSONAIZER in batches, after asking once a minute
 which streams the owner has switched on. Once a day each stream's **full list** is reconciled so nothing drifts.
 The connection is made once from the admin page; the chat widget rides on every page. Everything the owner
@@ -27,6 +27,7 @@ src/Site/Languages.php         every language the site publishes in, primary fir
 
 src/Content/PostPayload.php    a post → a files record { id, fingerprint, title, content (markdown), links, images }
 src/Content/ProductPayload.php a WooCommerce product → a catalog record { …, categories, attributes, variants, … }
+src/Content/StoreFacts.php     the store-facts stream: store-facts.md (settings) + categories.md (the product_cat tree)
 src/Content/Markdown.php       rendered HTML → markdown (headings, lists, links, tables), pure PHP
 src/Content/Fingerprint.php    md5 of the canonical record — what the full-list check compares
 

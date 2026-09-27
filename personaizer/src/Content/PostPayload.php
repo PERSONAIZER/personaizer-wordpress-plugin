@@ -22,12 +22,12 @@ final class PostPayload {
 
 	/** `wp-<post_type>-<ID>` — the site's stable record id. */
 	public static function external_id( WP_Post $post ) {
-		return 'wp-' . $post->post_type . '-' . $post->ID;
+		return (string) $post->ID;
 	}
 
 	/** The post id inside one of our external ids, or null. */
 	public static function post_id_of( $external_id ) {
-		return preg_match( '/^wp-[a-z0-9_-]+-(\d+)$/', (string) $external_id, $m ) ? (int) $m[1] : null;
+		return ctype_digit( (string) $external_id ) ? (int) $external_id : null;
 	}
 
 	/**
@@ -42,7 +42,7 @@ final class PostPayload {
 		$record                = array(
 			'id'      => self::external_id( $post ),
 			'title'   => $title,
-			'content' => '# ' . $title . "\n\n" . Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
+			'content' => Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
 			'links'   => array(
 				array(
 					'url'        => get_permalink( $post ),

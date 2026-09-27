@@ -2,7 +2,7 @@
   "request": {
     "upserts": [
       {
-        "id": "wp-page-4",
+        "id": "4",
         "fingerprint": "a",
         "title": "Delivery",
         "content": "# Delivery\n\nTwo days."
@@ -13,7 +13,7 @@
   "response": {
     "written": [],
     "deferred": [
-      "wp-page-4"
+      "4"
     ],
     "rejected": [],
     "deleted": 0,

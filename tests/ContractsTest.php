@@ -50,9 +50,9 @@ final class ContractsTest extends TestCase {
     public function test_items(): void {
         $catalog = pz_fixture( 'items.catalog' );
         $result  = Contracts::items_response( $catalog['response'] );
-        $this->assertSame( array( 'wc-product-88' ), $result['written'] );
-        $this->assertSame( array( 'wc-product-89' ), array_keys( $result['rejected'] ) );
-        $this->assertSame( 'knowledge.source_type_mismatch', $result['rejected']['wc-product-89']['code'] );
+        $this->assertSame( array( '88' ), $result['written'] );
+        $this->assertSame( array( '89' ), array_map( 'strval', array_keys( $result['rejected'] ) ), 'a numeric id is an int key in PHP; lookups by key match either way' );
+        $this->assertSame( 'knowledge.source_type_mismatch', $result['rejected']['89']['code'] );
         $this->assertFalse( $result['deletes_busy'] );
         // The request is the record shape Content\ProductPayload builds.
         $record = $catalog['request']['upserts'][0];
@@ -62,13 +62,13 @@ final class ContractsTest extends TestCase {
 
         $files = pz_fixture( 'items.files' );
         $result = Contracts::items_response( $files['response'] );
-        $this->assertSame( array( 'wp-page-2' ), $result['written'] );
-        $this->assertSame( array( 'wp-page-3' ), array_keys( $result['rejected'] ) );
-        $this->assertSame( 0, $result['deleted'], 'wp-page-7 was never held' );
+        $this->assertSame( array( '2' ), $result['written'] );
+        $this->assertSame( array( '3' ), array_map( 'strval', array_keys( $result['rejected'] ) ) );
+        $this->assertSame( 0, $result['deleted'], '7 was never held' );
         $this->assertSame( array( 'id', 'fingerprint', 'title', 'content', 'links', 'images' ), array_keys( $files['request']['upserts'][0] ) );
 
         $deferred = Contracts::items_response( pz_fixture( 'items.deferred' )['response'] );
-        $this->assertSame( array( 'wp-page-4' ), $deferred['deferred'] );
+        $this->assertSame( array( '4' ), $deferred['deferred'] );
         $this->assertSame( array(), $deferred['written'] );
     }
 
@@ -85,7 +85,7 @@ final class ContractsTest extends TestCase {
         $this->assertSame( array( 'id', 'fingerprint' ), array_keys( $r['request']['items'][0] ) );
         $result = Contracts::reconcile_response( $r['response'] );
         $this->assertSame( 12, $result['generation'] );
-        $this->assertSame( array( 'wc-product-90' ), $result['missing'] );
+        $this->assertSame( array( '90' ), $result['missing'] );
         $this->assertSame( array(), $result['stale'] );
         $this->assertFalse( $result['busy'] );
 

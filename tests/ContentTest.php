@@ -25,10 +25,19 @@ final class ContentTest extends TestCase {
         $this->assertSame( '', Markdown::from_html( '<div><script>x()</script></div>' ) );
     }
 
+    /** Records are named by their bare post ID, the id the site's public API shows — so onboarding and the install agree. */
+    public function test_record_ids_are_the_bare_post_id(): void {
+        $this->assertSame( '3485200', \Personaizer\Content\ProductPayload::external_id( 3485200 ) );
+        $this->assertSame( 3485200, \Personaizer\Content\ProductPayload::product_id_of( '3485200' ) );
+        $this->assertSame( 848, \Personaizer\Content\PostPayload::post_id_of( '848' ) );
+        $this->assertNull( \Personaizer\Content\PostPayload::post_id_of( 'wp-page-848' ), 'a pre-3.1 id is no record of ours' );
+        $this->assertNull( \Personaizer\Content\ProductPayload::product_id_of( 'store-facts' ) );
+    }
+
     public function test_fingerprint_ignores_key_order_but_not_list_order(): void {
-        $a = array( 'id' => 'wc-product-1', 'title' => 'A', 'images' => array( 'x', 'y' ), 'attributes' => array( 'sku' => '1', 'color' => array( 'Blue' ) ) );
-        $b = array( 'attributes' => array( 'color' => array( 'Blue' ), 'sku' => '1' ), 'images' => array( 'x', 'y' ), 'title' => 'A', 'id' => 'wc-product-1' );
-        $c = array( 'id' => 'wc-product-1', 'title' => 'A', 'images' => array( 'y', 'x' ), 'attributes' => array( 'sku' => '1', 'color' => array( 'Blue' ) ) );
+        $a = array( 'id' => '1', 'title' => 'A', 'images' => array( 'x', 'y' ), 'attributes' => array( 'sku' => '1', 'color' => array( 'Blue' ) ) );
+        $b = array( 'attributes' => array( 'color' => array( 'Blue' ), 'sku' => '1' ), 'images' => array( 'x', 'y' ), 'title' => 'A', 'id' => '1' );
+        $c = array( 'id' => '1', 'title' => 'A', 'images' => array( 'y', 'x' ), 'attributes' => array( 'sku' => '1', 'color' => array( 'Blue' ) ) );
         $this->assertSame( Fingerprint::of( $a ), Fingerprint::of( $b ) );
         $this->assertNotSame( Fingerprint::of( $a ), Fingerprint::of( $c ) );
         $this->assertMatchesRegularExpression( '/^[0-9a-f]{32}$/', Fingerprint::of( $a ) );

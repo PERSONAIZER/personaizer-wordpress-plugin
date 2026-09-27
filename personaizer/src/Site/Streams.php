@@ -1,6 +1,8 @@
 <?php
 namespace Personaizer\Site;
 
+use Personaizer\Content\StoreFacts;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -58,13 +60,19 @@ final class Streams {
 				'type'      => self::CATALOG,
 			);
 		}
+		// Built from the site's settings, not from posts (Content\StoreFacts).
+		$streams[ StoreFacts::STREAM ] = array(
+			'label'     => 'Store facts',
+			'post_type' => null,
+			'type'      => self::FILES,
+		);
 		return $streams;
 	}
 
 	/** The stream a post type belongs to, or null when it has none. */
 	public static function for_post_type( $post_type ) {
 		foreach ( self::all() as $key => $stream ) {
-			if ( $stream['post_type'] === $post_type ) {
+			if ( $stream['post_type'] !== null && $stream['post_type'] === $post_type ) {
 				return $key;
 			}
 		}
@@ -80,6 +88,9 @@ final class Streams {
 		$all = self::all();
 		if ( ! isset( $all[ $stream ] ) ) {
 			return 0;
+		}
+		if ( $stream === StoreFacts::STREAM ) {
+			return count( StoreFacts::ids() );
 		}
 		$counts = wp_count_posts( $all[ $stream ]['post_type'] );
 		return isset( $counts->publish ) ? (int) $counts->publish : 0;
