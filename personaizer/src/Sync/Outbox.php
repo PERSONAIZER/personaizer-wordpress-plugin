@@ -220,6 +220,25 @@ final class Outbox {
 
 	// ── the admin page's side ──
 
+	/**
+	 * Records still to push, per stream: queued upserts. Sent with every sync so PERSONAIZER shows the stream as
+	 * "writing N of M" until they have all landed (deletes and records waiting for plan room are not counted).
+	 *
+	 * @return array<string,int>
+	 */
+	public static function pending_upserts() {
+		global $wpdb;
+		self::ensure();
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( 'SELECT stream, COUNT(*) AS n FROM %i WHERE op = %s AND state = %s GROUP BY stream', self::table(), self::UPSERT, self::QUEUED )
+		);
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[ $row->stream ] = (int) $row->n;
+		}
+		return $out;
+	}
+
 	/** @return array<string,array{queued:int,deferred:int,failed:int}> per stream. */
 	public static function counts() {
 		global $wpdb;

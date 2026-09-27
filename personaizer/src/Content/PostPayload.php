@@ -32,17 +32,23 @@ final class PostPayload {
 
 	/**
 	 * @return array{id:string,fingerprint:string,title:string,content:string,links:array,images:array}|null
-	 *         Null for a post type that has no stream.
+	 *         Null for a post type that has no stream, and for a post with no text: the shop's machinery (cart,
+	 *         checkout, my account) and pages a theme draws from elsewhere. Null makes it a delete, and keeps it off
+	 *         the full list, so it is never held as a document with nothing to answer from.
 	 */
 	public static function build( WP_Post $post ) {
 		if ( Streams::for_post_type( $post->post_type ) === null ) {
+			return null;
+		}
+		$content = Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
+		if ( trim( $content ) === '' ) {
 			return null;
 		}
 		$title                 = self::title( $post );
 		$record                = array(
 			'id'      => self::external_id( $post ),
 			'title'   => $title,
-			'content' => Markdown::from_html( (string) apply_filters( 'the_content', $post->post_content ) ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- applying a core filter, not defining one
+			'content' => $content,
 			'links'   => array(
 				array(
 					'url'        => get_permalink( $post ),

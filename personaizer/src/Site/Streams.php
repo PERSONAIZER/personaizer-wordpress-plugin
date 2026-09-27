@@ -2,6 +2,7 @@
 namespace Personaizer\Site;
 
 use Personaizer\Content\StoreFacts;
+use Personaizer\Sync\Outbox;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -100,16 +101,21 @@ final class Streams {
 	 * The inventory the site reports: every stream with a label, its published count and its type. Sent on connect
 	 * and with every sync, so the owner switches streams on from a list that reflects the site as it is now.
 	 *
-	 * @return array<int,array{stream_key:string,label:string,count:int,type:string}>
+	 * `pending` is what the outbox still has to push for the stream, so the owner sees it being written, not "ready"
+	 * between two batches.
+	 *
+	 * @return array<int,array{stream_key:string,label:string,count:int,type:string,pending:int}>
 	 */
 	public static function inventory() {
-		$out = array();
+		$out     = array();
+		$pending = Outbox::pending_upserts();
 		foreach ( self::all() as $key => $stream ) {
 			$out[] = array(
 				'stream_key' => $key,
 				'label'      => $stream['label'],
 				'count'      => self::published_count( $key ),
 				'type'       => $stream['type'],
+				'pending'    => $pending[ $key ] ?? 0,
 			);
 		}
 		return $out;

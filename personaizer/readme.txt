@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.0
+Stable tag: 3.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,10 @@ In WordPress it stores your integration key, brand and persona ids, your account
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 3.1.1 =
+* While records are still being sent, PERSONAIZER shows each stream as being written (with how many are left) instead of "ready" between batches.
+* Pages with no text of their own (cart, checkout, my account, or pages a theme draws from elsewhere) are no longer sent, so they stop showing up as refused.
 
 = 3.1.0 =
 * Records are named by their WordPress post ID, the same id PERSONAIZER gives them when it reads your site before the plugin is installed, so installing enriches that knowledge instead of adding a second copy. After updating, the plugin sends its full lists once more on its own; nothing needs doing.
