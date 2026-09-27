@@ -8,6 +8,7 @@ use Personaizer\Sync\Backfill;
 use Personaizer\Sync\Outbox;
 use Personaizer\Sync\Reconcile;
 use Personaizer\Sync\State;
+use Personaizer\Sync\Worker;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -116,8 +117,10 @@ final class Page {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		// The owner is watching: a pending backfill advances at the end of this request rather than on the next cron tick.
+		// The owner is watching: a pending backfill and the queued records advance at the end of this request rather
+		// than on the next cron tick (which some hosts never fire).
 		Backfill::run_soon();
+		Worker::run_soon();
 		$model = self::model();
 		include PERSONAIZER_PLUGIN_DIR . '/src/Admin/views/page.php';
 	}

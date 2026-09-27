@@ -31,8 +31,32 @@ final class Worker {
 
 	private static $armed_for_shutdown = false;
 
+	/** A visitor's request pushes at most one batch this often (WP-Cron's stand-in on hosts where it never fires). */
+	const VISIT_EVERY_SECONDS = 30;
+	const VISIT_LOCK          = 'personaizer_worker_visit';
+
 	public static function boot() {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
+		add_action( 'shutdown', array( __CLASS__, 'run_after_visit' ), 6 );
+	}
+
+	/**
+	 * Any request, once the visitor already has the page: when records are queued, push a batch. Only where PHP can
+	 * finish the response first (PHP-FPM), so no visitor ever waits for it; throttled so a busy site pushes once per
+	 * VISIT_EVERY_SECONDS, not on every hit. This is what keeps a sync moving on hosts that block WP-Cron's loopback.
+	 */
+	public static function run_after_visit() {
+		if ( self::$armed_for_shutdown || ! function_exists( 'fastcgi_finish_request' ) || ! Options::is_connected()
+			|| wp_doing_cron() || get_transient( self::VISIT_LOCK ) ) {
+			return;
+		}
+		// The lock first: an idle site asks the outbox at most once per VISIT_EVERY_SECONDS, not on every hit.
+		set_transient( self::VISIT_LOCK, 1, self::VISIT_EVERY_SECONDS );
+		if ( empty( Outbox::streams_with_work() ) ) {
+			return;
+		}
+		fastcgi_finish_request();
+		self::drain( self::SHUTDOWN_BUDGET_SECONDS );
 	}
 
 	/** Something was enqueued: run soon. A single event; arming twice is one run. */
@@ -44,6 +68,16 @@ final class Worker {
 		if ( is_admin() && ! self::$armed_for_shutdown ) {
 			self::$armed_for_shutdown = true;
 			add_action( 'shutdown', array( __CLASS__, 'run_at_shutdown' ), 5 );
+		}
+	}
+
+	/**
+	 * The owner is watching: push what is queued at the end of this request, not on the next WP-Cron tick — some hosts
+	 * never fire WP-Cron (loopback requests blocked), and the admin page reloads itself while anything is in flight.
+	 */
+	public static function run_soon() {
+		if ( ! empty( Outbox::streams_with_work() ) ) {
+			self::arm();
 		}
 	}
 
