@@ -57,7 +57,7 @@ final class ProductPayload {
 			'images'      => self::images( $product ),
 			'links'       => array(
 				array(
-					'url'        => get_permalink( $id ),
+					'url'        => rawurldecode( (string) get_permalink( $id ) ), // non-Latin slugs readable, as browsers show them
 					'is_primary' => true,
 				),
 			),

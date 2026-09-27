@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.2
+Stable tag: 3.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,10 @@ In WordPress it stores your integration key, brand and persona ids, your account
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
 == Changelog ==
+
+= 3.1.3 =
+* Store facts no longer say "sells to every country" when that is only WooCommerce's default setting.
+* Links to pages, products and categories are sent readable (`/product-category/აქსესუარები/`), not percent-encoded.
 
 = 3.1.2 =
 * A sync no longer stalls on hosts where WordPress's scheduled tasks (WP-Cron) don't run: queued records are also sent on every refresh of the PERSONAIZER page, and after ordinary visits (once the visitor already has the page, at most every 30 seconds).

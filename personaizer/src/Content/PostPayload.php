@@ -51,7 +51,7 @@ final class PostPayload {
 			'content' => $content,
 			'links'   => array(
 				array(
-					'url'        => get_permalink( $post ),
+					'url'        => rawurldecode( (string) get_permalink( $post ) ), // non-Latin slugs readable, as browsers show them
 					'is_primary' => true,
 				),
 			),

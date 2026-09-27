@@ -10,7 +10,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * The `store-facts` stream: what a shopper asks about the shop itself, built from the site's settings rather than
  * from a post — `store-facts` (name, tagline, currency, address, where it sells and ships, taxes, payment methods,
- * time zone, privacy and terms pages) and, with WooCommerce, `categories` (the product category tree with links).
+ * time zone, privacy and terms pages) and, with WooCommerce, `categories` (the product category tree with each
+ * category's page, the links the catalog itself doesn't carry). Where it sells and ships is stated only when the
+ * owner set it: WooCommerce's default "all countries" says nothing and would read as "we ship worldwide".
  *
  * The ids are the ones PERSONAIZER's onboarding gives the same records when it reads the site before install, so the
  * install enriches them in place.
@@ -68,7 +70,7 @@ final class StoreFacts {
 			if ( $address !== '' ) {
 				$lines[] = '- Based in: ' . $address;
 			}
-			$sells = self::countries( 'woocommerce_allowed_countries', 'woocommerce_specific_allowed_countries', 'woocommerce_all_except_countries' );
+			$sells = self::sells_to();
 			if ( $sells !== '' ) {
 				$lines[] = '- Sells to: ' . $sells;
 			}
@@ -143,7 +145,7 @@ final class StoreFacts {
 		foreach ( $level as $term ) {
 			$link    = get_term_link( $term );
 			$lines[] = str_repeat( '  ', $depth ) . '- ' . html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' )
-				. ( is_wp_error( $link ) ? '' : ': ' . $link );
+				. ( is_wp_error( $link ) ? '' : ': ' . rawurldecode( $link ) ); // non-Latin slugs readable
 			self::outline( $children, (int) $term->term_id, $depth + 1, $lines );
 		}
 	}
@@ -164,16 +166,14 @@ final class StoreFacts {
 		return implode( ', ', $parts );
 	}
 
-	private static function countries( $mode_option, $specific_option, $except_option ) {
-		$mode = get_option( $mode_option, 'all' );
+	/** Where the shop sells, when the owner narrowed it; '' at WooCommerce's default ("all countries"). */
+	private static function sells_to() {
+		$mode = get_option( 'woocommerce_allowed_countries', 'all' );
 		if ( $mode === 'specific' ) {
-			return self::country_names( (array) get_option( $specific_option, array() ) );
+			return self::country_names( (array) get_option( 'woocommerce_specific_allowed_countries', array() ) );
 		}
-		if ( $mode === 'all_except' ) {
-			$except = (array) get_option( $except_option, array() );
-			return empty( $except ) ? 'every country' : 'every country except ' . self::country_names( $except );
-		}
-		return 'every country';
+		$except = (array) get_option( 'woocommerce_all_except_countries', array() );
+		return $mode === 'all_except' && ! empty( $except ) ? 'every country except ' . self::country_names( $except ) : '';
 	}
 
 	private static function country_names( array $codes ) {
