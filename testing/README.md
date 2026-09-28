@@ -40,41 +40,25 @@ version guards exist to prevent.
 3. **Import the catalog**: Products → Import → upload `woocommerce-sample-products.csv` → run it. You
    should get ~20 products, with the Hoodie and V-Neck Tee carrying colour/size variations and images.
 
-4. **Build + upload the plugin.** Two ways to make it talk to dev — pick one:
+4. **Point the site at dev** with `dev-override.php` (already filled in for dev, no editing):
 
-   **A. Dev-baked zip (simplest — no override file, skip step 5):**
-   ```bash
-   ./build-zip.sh --dev     # → dist/personaizer-chat-<ver>-dev.zip
-   ```
-   Plugins → Add New → **Upload Plugin** → the `-dev.zip` → Activate. It already points at dev. Done.
+   **mu-plugin (preferred)**: put it into the site's `wp-content/mu-plugins/` (create the folder; the file must
+   sit *directly* in it, not in a sub-folder). On TasteWP this needs the free **WP File Manager** plugin.
 
-   **B. Prod zip + override (closer to what a real owner installs):**
-   ```bash
-   ./build-zip.sh           # → dist/personaizer-chat-<ver>.zip
-   ```
-   Upload that zip, then do step 5.
-
-   Both write to the gitignored `dist/` — a consistent spot, never committed (a stale
-   committed zip is how you end up testing the wrong version).
-
-5. **(Only for option B) Point it at dev** with `dev-override.php`. It's already filled in for dev — no
-   editing needed. Two routes:
-
-   **mu-plugin (preferred)** — put it into the site's `wp-content/mu-plugins/` (create the folder; the
-   file must sit *directly* in it, not in a sub-folder). On TasteWP this needs the free **WP File
-   Manager** plugin.
-
-   **Ordinary plugin** — when the host gives you no filesystem at all. A TasteWP *temp* (free) site has
-   no dashboard file manager and no SFTP, so the route above is unavailable there.
+   **Ordinary plugin**: when the host gives you no filesystem at all (a TasteWP *temp* site has no file
+   manager and no SFTP).
    ```bash
    testing/build-dev-override-zip.sh   # → dist/personaizer-dev-override.zip
    ```
-   Upload it and **activate it BEFORE the PERSONAIZER plugin**. This works only because the plugin
-   declares every constant behind `if(!defined())` AND WordPress includes active plugins in *activation*
-   order — activate it second and it is a silent no-op. (Alphabetical order is not what decides this.)
-   - Verify: **PERSONAIZER → System info → API base** should read `https://dev-api.personaizer.com`.
-   - Skip options B/5 entirely when testing against **prod** (once prod is deployed): the plugin defaults
-     to prod, so no override or dev build is needed.
+   Upload it and **activate it BEFORE the PERSONAIZER plugin**. This works only because the plugin declares
+   every constant behind `if(!defined())` and WordPress loads active plugins in *activation* order; activated
+   second, it does nothing. (Alphabetical order is not what decides this.)
+
+   Skip this step to test against **prod**: the plugin defaults to prod.
+
+5. **Build + upload the plugin**: `./build-zip.sh` → `dist/personaizer-chat-<ver>.zip` → Plugins → Add New →
+   **Upload Plugin** → Activate (or "Replace current with uploaded"). Verify **PERSONAIZER → System info →
+   API base** reads `https://dev-api.personaizer.com`.
 
 6. **Connect**: PERSONAIZER menu → **Connect** → approve on the consent screen → let it sync.
 

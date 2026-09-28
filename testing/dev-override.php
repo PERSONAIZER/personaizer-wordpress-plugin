@@ -4,9 +4,8 @@
  * Description: Points the PERSONAIZER plugin at the DEV backend instead of production. Remove to return to prod.
  * Version: 1.0.0
  *
- * Use this with a PROD plugin zip (README option B) — the point of that option is to install the exact
- * artifact a real owner installs and steer it from outside. `build-zip.sh --dev` is the alternative,
- * and it bakes dev URLs into the package itself.
+ * The plugin package always points at production; this file on a test site steers that exact package at dev
+ * (see RELEASING.md, "The pipeline").
  *
  * Two ways to install it, depending on whether the test host lets you touch the filesystem:
  *

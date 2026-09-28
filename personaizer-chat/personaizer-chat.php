@@ -22,8 +22,8 @@ define( 'PERSONAIZER_PLUGIN_FILE', __FILE__ );
 define( 'PERSONAIZER_PLUGIN_DIR', __DIR__ );
 
 // ── Where PERSONAIZER is ──────────────────────────────────────────────────────
-// The source ALWAYS defaults to production; build-zip.sh rewrites the staged copy for a --dev build, and a
-// wp-config.php define() wins over everything (testing/dev-override.php does exactly that):
+// The source ALWAYS defaults to production (build-zip.sh refuses anything else). A define() that loads first
+// wins, which is how a test site points it at dev (testing/dev-override.php in mu-plugins):
 //   define( 'PERSONAIZER_API_URL', 'https://dev-api.personaizer.com' );
 //   define( 'PERSONAIZER_APP_URL', 'https://dev.personaizer.com' );
 //   define( 'PERSONAIZER_WIDGET_URL', 'https://personaizerdevstore2.blob.core.windows.net/platform-builds-public/chat.js' );

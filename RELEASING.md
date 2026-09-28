@@ -10,6 +10,26 @@ repo's GitHub Releases as an archive of the same zip, for anyone installing by h
 | SVN | https://plugins.svn.wordpress.org/personaizer-chat, username `personaizer` |
 | Display name | PERSONAIZER (the plugin header and `readme.txt` title; only the slug is fixed) |
 
+## The pipeline: change → test on dev → publish
+
+There is one package: the one clients get. It always points at production; a test site points it at dev.
+
+**Once, on the test site:** put `testing/dev-override.php` directly into `wp-content/mu-plugins/`. From then
+on, any PERSONAIZER plugin on that site talks to dev (PERSONAIZER → System info → API base reads
+`https://dev-api.personaizer.com`). It lives outside the plugin folder, so installs and updates keep it.
+A host with no file access: see `testing/README.md`.
+
+**Every change:**
+
+1. Change the code in `personaizer-chat/`.
+2. `./build-zip.sh` → `dist/personaizer-chat-<version>.zip`.
+3. On the test site: Plugins → Add New → Upload Plugin → the zip → **Replace current with uploaded**. It runs
+   against dev. Repeat 1–3 until it's right; nothing is published.
+4. Bump the version and add a changelog entry (see "Every release" below), commit, push.
+5. `./release.sh` → WordPress.org has the new version; every site that has the plugin is offered the update.
+
+What you tested in step 3 is byte for byte what sites install after step 5.
+
 ## One-time setup
 
 - **SVN password:** WordPress.org → Profile → Account & Security. It is separate from the login password.
@@ -24,7 +44,7 @@ repo's GitHub Releases as an archive of the same zip, for anyone installing by h
    disagree. `Stable tag` is what tells WordPress.org which tag sites get.
 2. Add a `== Changelog ==` entry in `readme.txt`. If the backend's contract fixtures changed, run
    `tools/sync-fixtures.sh` and make the tests green first (`php tools/phpunit.phar`).
-3. Commit and push, then:
+3. Commit and push. Then (the pipeline's step 5):
    ```bash
    ./release.sh --dry-run   # optional: stage the SVN changes and show them, commit nothing
    ./release.sh

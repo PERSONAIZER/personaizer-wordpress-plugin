@@ -29,7 +29,7 @@ persona automatically — no paid account is needed to try it.
 ```bash
 tools/sync-fixtures.sh          # copy the backend's recorded API exchanges into fixtures/
 php tools/phpunit.phar          # unit tests, no WordPress needed (curl -L -o tools/phpunit.phar https://phar.phpunit.de/phpunit-11.phar)
-./build-zip.sh --dev            # a zip that talks to dev-api.personaizer.com → dist/
+./build-zip.sh                  # the package → dist/; test it on a site with testing/dev-override.php
 ```
 
 Everything the owner configures beyond that — the widget's look, greeting, FAQ, and the persona itself —
@@ -40,7 +40,7 @@ those settings.
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the plugin is put together: the file map, the two backend
   auth modes, and how content sync/backfill/reconciliation fit together.
-- **[RELEASING.md](RELEASING.md)** — the WordPress.org listing and how to ship a new version.
+- **[RELEASING.md](RELEASING.md)** — the pipeline (change → test on dev → publish) and the WordPress.org listing.
 - The plugin's own `readme.txt` (inside `personaizer-chat/`, bundled in every release zip) is the
   WordPress.org-facing feature list, FAQ, and changelog.
 - **[testing/](testing/)** — a turnkey kit for validating the plugin against a real public WordPress site
@@ -52,7 +52,7 @@ those settings.
 ```
 personaizer-chat/  the plugin itself (the WordPress.org slug) — its contents are exactly what ships
 .wordpress-org/     listing images (icons, banners) that release.sh puts in SVN assets/
-build-zip.sh        packages personaizer-chat/ into an installable zip (prod / --dev)
+build-zip.sh        packages personaizer-chat/ into the installable zip
 release.sh          releases a version: WordPress.org SVN, then a GitHub release as the archive
 testing/            kit for testing against a real public site + the WooCommerce sample catalog
 ```
