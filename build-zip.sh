@@ -1,24 +1,22 @@
 #!/usr/bin/env bash
-# Package the WordPress plugin — the artifact a site owner installs via
-# WP Admin → Plugins → Add New → Upload Plugin (and the same one we'd submit to wordpress.org).
+# Package the WordPress plugin: the folder WordPress.org serves, and the zip a site owner can install by hand
+# (WP Admin -> Plugins -> Add New -> Upload Plugin).
 #
-#   ./build-zip.sh              # PROD build  → dist/  (self-hosted release)
-#   ./build-zip.sh --dev        # DEV  build  → dist/  (points at dev-api)
-#   ./build-zip.sh --org        # WORDPRESS.ORG submission build → dist/  (updater stripped)
-#   ./build-zip.sh ~/Desktop    # PROD build  → a directory of your choosing
-#   ./build-zip.sh --dev ~/foo  # DEV  build  → there
+#   ./build-zip.sh              # PROD build  -> dist/
+#   ./build-zip.sh --dev        # DEV  build  -> dist/  (points at dev-api)
+#   ./build-zip.sh ~/Desktop    # PROD build  -> a directory of your choosing
+#   ./build-zip.sh --dev ~/foo  # DEV  build  -> there
 #
-# Output goes to dist/ by default — a gitignored folder, so the location is consistent
-# (not scattered across $TMPDIR / your Desktop) but the binary is never committed. A committed zip drifts
-# from source and you end up testing the wrong version; this rebuilds it fresh every time.
+# Output goes to dist/ by default: a gitignored folder, so the location is consistent but the binary is never
+# committed. A committed zip drifts from source and you end up testing the wrong version.
 #
 # The ONLY difference between the prod and dev packages is the baked-in backend URLs. The repo source
-# ALWAYS defaults to production (a guard enforces it) — `--dev` rewrites those three URLs in a throwaway
+# ALWAYS defaults to production (a guard enforces it); `--dev` rewrites those three URLs in a throwaway
 # staged copy AFTER the guard, so the source stays clean and a dev build can never leak into a release.
 # A DEV build is a local test artifact: install it by hand, never publish it.
 #
-# `--org` builds the wordpress.org submission package: identical to prod, minus the self-hosted updater
-# (the directory serves updates there, so shipping our own update channel is a hard rejection).
+# Updates come from WordPress.org only. The plugin has no update channel of its own (the directory rejects
+# one), and a guard below keeps it that way.
 set -euo pipefail
 
 # ── Args: --dev/--prod flag (default prod) + optional output dir ───────────────
@@ -28,15 +26,14 @@ for arg in "$@"; do
     case "$arg" in
         --dev)  ENV="dev" ;;
         --prod) ENV="prod" ;;
-        --org)  ENV="org" ;;
-        -*)     echo "error: unknown flag '$arg' (use --dev, --prod or --org)" >&2; exit 1 ;;
+        -*)     echo "error: unknown flag '$arg' (use --dev or --prod)" >&2; exit 1 ;;
         *)      OUT_DIR="$arg" ;;
     esac
 done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$HERE/personaizer"
-SLUG="personaizer"
+SLUG="personaizer-chat"   # the WordPress.org slug: folder, main file and text domain
+SRC_DIR="$HERE/$SLUG"
 OUT_DIR="${OUT_DIR:-$HERE/dist}"
 
 [ -d "$SRC_DIR" ] || { echo "error: $SRC_DIR not found" >&2; exit 1; }
@@ -47,7 +44,6 @@ VERSION="$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\(.*\)$/\1/p
 [ -n "$VERSION" ] || { echo "error: no 'Version:' header in $SLUG.php" >&2; exit 1; }
 SUFFIX=""
 [ "$ENV" = "dev" ] && SUFFIX="-dev"
-[ "$ENV" = "org" ] && SUFFIX="-org"
 ZIP_PATH="$OUT_DIR/$SLUG-$VERSION$SUFFIX.zip"
 
 # readme.txt's "Stable tag" is the version a human reads as current — and, self-hosted, the only place an
@@ -57,17 +53,11 @@ STABLE="$(sed -n 's/^Stable tag:[[:space:]]*\(.*\)$/\1/p' "$SRC_DIR/readme.txt" 
 [ "$STABLE" = "$VERSION" ] \
     || { echo "error: readme.txt Stable tag ($STABLE) != plugin header Version ($VERSION)" >&2; exit 1; }
 
-# PERSONAIZER_VERSION is what the running plugin compares against the update manifest. If it lagged the
-# header, an installed site would keep re-offering an update it already has (or miss one it needs).
+# PERSONAIZER_VERSION is what the running plugin reports (System info, API calls); keep it equal to the header.
 CONST_VERSION="$(sed -n "s/^define( 'PERSONAIZER_VERSION', '\([^']*\)' );.*$/\1/p" "$SRC_DIR/$SLUG.php" | head -1)"
 [ "$CONST_VERSION" = "$VERSION" ] \
     || { echo "error: PERSONAIZER_VERSION ($CONST_VERSION) != plugin header Version ($VERSION)" >&2; exit 1; }
 echo "✓ version $VERSION agrees across header, PERSONAIZER_VERSION and readme Stable tag"
-
-# Where a PUBLISHED prod zip will live (the manifest advertises this URL). Dev builds don't get a manifest.
-# A release's assets are served from github.com, the same host the manifest permalink resolves against —
-# which is what satisfies the updater's same-host rule (Personaizer_Updater::trusted_package).
-DIST_BASE="${PERSONAIZER_DIST_BASE:-https://github.com/PERSONAIZER/personaizer-wordpress-plugin/releases/download/v$VERSION}"
 
 # ── Guard: the SOURCE must default to PRODUCTION (both build modes) ────────────
 # Local/dev URLs belong in wp-config.php or a --dev build, never in the source. Comments may document
@@ -84,7 +74,7 @@ echo "✓ source defaults point at production"
 
 # ── Stage ─────────────────────────────────────────────────────────────────────
 # WordPress installs whatever top-level directory the zip contains, so the tree must be
-# rooted at "personaizer/" — not at the files themselves.
+# rooted at the slug folder, not at the files themselves.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$SLUG"
@@ -104,29 +94,16 @@ if [ "$ENV" = "dev" ]; then
         || { echo "error: dev rewrite of PERSONAIZER_API_URL failed — did the define change?" >&2; exit 1; }
     grep -q "define( 'PERSONAIZER_APP_URL', 'https://dev.personaizer.com' );" "$dp/$SLUG.php" \
         || { echo "error: dev rewrite of PERSONAIZER_APP_URL failed — did the define change?" >&2; exit 1; }
-    # Drop the updater. There is one release line now (GitHub Releases), so a dev build that kept it
-    # would poll that line and offer the tester a PROD package — quietly replacing the dev URLs they
-    # installed it for. A hand-installed test artifact has no business auto-updating; rebuild instead.
-    rm -f "$dp/src/Updater.php"
-    echo "✓ dev build — rewrote API→dev-api.personaizer.com, dashboard→dev.personaizer.com, widget→dev blob; updater removed"
+    echo "✓ dev build — rewrote API→dev-api.personaizer.com, dashboard→dev.personaizer.com, widget→dev blob"
 fi
 
-# ── ORG: strip the self-hosted updater ────────────────────────────────────────
-# wordpress.org serves updates itself; a plugin that ships its own update channel (the
-# pre_set_site_transient_update_plugins / plugins_api filters) is a hard rejection. The main file loads the
-# updater only when the file is present, so dropping the file is enough — then assert nothing update-related
-# survived in what actually ships.
-if [ "$ENV" = "org" ]; then
-    dp="$STAGE/$SLUG"
-    rm -f "$dp/src/Updater.php"
-    [ ! -f "$dp/src/Updater.php" ] \
-        || { echo "error: could not drop the updater from the org build" >&2; exit 1; }
-    if grep -rEq 'pre_set_site_transient_update_plugins|PERSONAIZER_UPDATE_MANIFEST_URL' "$dp"; then
-        echo "error: org build still carries self-hosted update code — wordpress.org would reject it:" >&2
-        grep -rEn 'pre_set_site_transient_update_plugins|PERSONAIZER_UPDATE_MANIFEST_URL' "$dp" >&2
-        exit 1
-    fi
-    echo "✓ org build — self-hosted updater removed (wordpress.org serves updates)"
+# ── Guard: no update channel of our own ───────────────────────────────────────
+# WordPress.org serves updates; a plugin that hooks the update transients or the plugin-info API to point
+# elsewhere is closed by the directory.
+if grep -rEq 'pre_set_site_transient_update_plugins|site_transient_update_plugins|plugins_api' "$STAGE/$SLUG"; then
+    echo "error: the build carries self-hosted update code, which WordPress.org forbids:" >&2
+    grep -rEn 'pre_set_site_transient_update_plugins|site_transient_update_plugins|plugins_api' "$STAGE/$SLUG" >&2
+    exit 1
 fi
 
 # ── Syntax check the STAGED tree (what actually ships, incl. any dev rewrite) ──
@@ -162,121 +139,13 @@ import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as z:
     names = z.namelist()
     roots = {n.split("/")[0] for n in names}
-    assert roots == {"personaizer"}, f"zip root must be the plugin folder, got {roots}"
+    assert roots == {"personaizer-chat"}, f"zip root must be the plugin folder, got {roots}"
     for n in sorted(names):
         print("   ", n)
 PY
 
-# ── DEV stops here: a local test artifact, no manifest, not for publishing ─────
-if [ "$ENV" = "dev" ]; then
-    echo ""
-    echo "DEV TEST BUILD — points at dev-api.personaizer.com. Install by hand; do NOT publish."
-    if command -v cygpath >/dev/null 2>&1; then echo "  zip  $(cygpath -w "$ZIP_PATH")"; else echo "  zip  $ZIP_PATH"; fi
-    exit 0
-fi
-
-# ── ORG stops here: the wordpress.org submission zip. No manifest — the directory serves updates. ──
-if [ "$ENV" = "org" ]; then
-    echo ""
-    echo "WORDPRESS.ORG SUBMISSION BUILD — updater stripped; the directory serves updates."
-    echo "First release: upload this zip at https://wordpress.org/plugins/developers/add/. After approval, push to SVN."
-    if command -v cygpath >/dev/null 2>&1; then echo "  zip  $(cygpath -w "$ZIP_PATH")"; else echo "  zip  $ZIP_PATH"; fi
-    exit 0
-fi
-
-# ── Update manifest (PROD builds only) ────────────────────────────────────────
-# The file installed sites poll to learn a new version exists. Generated here, from the same readme and
-# header the zip was just built from, so the advertised version/requirements cannot disagree with what is
-# actually inside the package. Publish it beside the zip; both must sit on the same host.
-MANIFEST_PATH="$OUT_DIR/$SLUG.json"
-python - "$SRC_DIR/readme.txt" "$SRC_DIR/$SLUG.php" "$MANIFEST_PATH" "$VERSION" "$DIST_BASE/$SLUG-$VERSION.zip" <<'PY'
-import html, json, re, sys, time
-
-readme_path, plugin_path, out_path, version, download_url = sys.argv[1:6]
-readme = open(readme_path, encoding="utf-8").read()
-plugin = open(plugin_path, encoding="utf-8").read()
-
-def readme_field(name, default=""):
-    m = re.search(r"^%s:\s*(.+)$" % re.escape(name), readme, re.M)
-    return m.group(1).strip() if m else default
-
-def header_field(name, default=""):
-    m = re.search(r"^\s*\*\s*%s:\s*(.+)$" % re.escape(name), plugin, re.M)
-    return m.group(1).strip() if m else default
-
-def inline(s):
-    s = html.escape(s)
-    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', s)
-    s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
-    return s
-
-def to_html(text):
-    """readme.txt markup -> the small HTML subset the 'View details' modal renders."""
-    out, bullets, para = [], [], []
-    def flush_para():
-        if para:
-            out.append("<p>%s</p>" % " ".join(para).strip())
-            del para[:]
-    def flush_bullets():
-        if bullets:
-            out.append("<ul>%s</ul>" % "".join("<li>%s</li>" % b for b in bullets))
-            del bullets[:]
-    for raw in text.split("\n"):
-        line = raw.strip()
-        if not line:
-            flush_bullets(); flush_para(); continue
-        heading = re.match(r"^=+\s*(.+?)\s*=+$", line)
-        if heading:
-            flush_bullets(); flush_para()
-            out.append("<h4>%s</h4>" % inline(heading.group(1)))
-        elif line.startswith("* "):
-            flush_para()
-            bullets.append(inline(line[2:].strip()))
-        else:
-            flush_bullets()
-            para.append(inline(line))
-    flush_bullets(); flush_para()
-    return "\n".join(out)
-
-sections = dict(re.findall(r"^==\s*(.+?)\s*==[ \t]*\n(.*?)(?=^==\s|\Z)", readme, re.M | re.S))
-
-manifest = {
-    "name": header_field("Plugin Name", "PERSONAIZER"),
-    "slug": "personaizer",
-    "version": version,
-    "requires": readme_field("Requires at least"),
-    "requires_php": readme_field("Requires PHP"),
-    "tested": readme_field("Tested up to"),
-    "last_updated": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
-    "homepage": header_field("Plugin URI", "https://personaizer.com/wordpress"),
-    "author": header_field("Author", "PersonAIzer"),
-    "download_url": download_url,
-    "sections": {
-        "description": to_html(sections.get("Description", "").strip()),
-        "changelog": to_html(sections.get("Changelog", "").strip()),
-    },
-}
-for required in ("requires", "requires_php", "tested"):
-    if not manifest[required]:
-        sys.exit("error: readme.txt is missing the field behind '%s'" % required)
-
-with open(out_path, "w", encoding="utf-8") as f:
-    json.dump(manifest, f, indent=2)
-    f.write("\n")
-# ASCII only: Python's stdout is cp1252 on Windows and would die on a tick mark.
-print("wrote %s (advertises %s)" % (out_path.rsplit("/", 1)[-1], manifest["download_url"]))
-PY
-
-# Print paths a Windows file picker will accept, when we're on Git Bash.
+# Print a path a Windows file picker will accept, when we're on Git Bash.
 echo ""
-echo "Attach BOTH to the GitHub release (./release.sh does this):"
-if command -v cygpath >/dev/null 2>&1; then
-    echo "  zip      $(cygpath -w "$ZIP_PATH")"
-    echo "  manifest $(cygpath -w "$MANIFEST_PATH")"
-else
-    echo "  zip      $ZIP_PATH"
-    echo "  manifest $MANIFEST_PATH"
-fi
-echo ""
-echo "Both, or neither: the zip alone leaves every installed site polling the PREVIOUS"
-echo "release's manifest, so it is never offered this version and nothing reports an error."
+[ "$ENV" = "dev" ] && echo "DEV TEST BUILD — points at dev-api.personaizer.com. Install by hand; do NOT publish."
+[ "$ENV" = "prod" ] && echo "PROD build. Publish with ./release.sh (WordPress.org SVN + GitHub release)."
+if command -v cygpath >/dev/null 2>&1; then echo "  zip  $(cygpath -w "$ZIP_PATH")"; else echo "  zip  $ZIP_PATH"; fi

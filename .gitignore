@@ -1,6 +1,8 @@
-# Built plugin zips + manifests land here — consistent, predictable location, but never committed.
+# Built plugin zips land here — consistent, predictable location, but never committed.
 # A committed zip goes stale and you end up testing the wrong version (build-zip.sh regenerates it).
 dist/
 # PHPUnit phar for local runs (tools/phpunit.phar) — fetched, not committed.
 tools/phpunit.phar
 .phpunit.result.cache
+# The WordPress.org SVN working copy release.sh commits from.
+.svn-checkout/

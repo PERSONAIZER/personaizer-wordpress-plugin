@@ -46,10 +46,6 @@ final class Plugin {
 		Page::boot();
 		Embed::boot();
 		IdentityToken::boot();
-		// The self-hosted update channel ships in prod zips only (build-zip.sh strips it for --dev and --org).
-		if ( is_file( PERSONAIZER_PLUGIN_DIR . '/src/Updater.php' ) ) {
-			Updater::boot();
-		}
 	}
 
 	public static function activate() {

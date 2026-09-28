@@ -1,23 +1,23 @@
 <?php
 /**
  * Plugin Name: PERSONAIZER
- * Plugin URI:  https://github.com/PERSONAIZER/personaizer-wordpress-plugin
+ * Plugin URI:  https://wordpress.org/plugins/personaizer-chat/
  * Description: Connect this site to PERSONAIZER: its pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them.
- * Version:     3.1.3
+ * Version:     3.1.4
  * Requires at least: 6.2
  * Requires PHP: 7.4
  * Author:      PERSONAIZER
  * Author URI:  https://personaizer.com
  * License:     GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: personaizer
+ * Text Domain: personaizer-chat
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'PERSONAIZER_VERSION', '3.1.3' );
+define( 'PERSONAIZER_VERSION', '3.1.4' );
 define( 'PERSONAIZER_PLUGIN_FILE', __FILE__ );
 define( 'PERSONAIZER_PLUGIN_DIR', __DIR__ );
 

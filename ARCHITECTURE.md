@@ -13,7 +13,7 @@ configures lives on personaizer.com — this plugin has one setting of its own (
 ## File map
 
 ```
-personaizer.php                bootstrap: header, the three URL constants, PSR-4 loader, activation hooks
+personaizer-chat.php           bootstrap: header, the three URL constants, PSR-4 loader, activation hooks
 src/Plugin.php                 wiring — every part registers its hooks here
 src/Options.php                every wp_option the plugin keeps, named once
 src/Data.php                   what Disconnect and uninstall.php remove (options, outbox, schedules, transients)
@@ -43,7 +43,6 @@ src/Connect/Flow.php           Connect (start → consent screen → callback �
 src/Admin/Page.php + views/    the status page
 src/Widget/Embed.php           chat.js on every page, with the persona's public id
 src/Widget/IdentityToken.php   the signed-in-customer token endpoint (HS256 with the account's identity secret)
-src/Updater.php                self-hosted "update available" channel — stripped from --dev and --org builds
 
 fixtures/v1-integration/       the backend's recorded exchanges, copied by tools/sync-fixtures.sh
 tests/                         PHPUnit, no WordPress: Contracts against the fixtures, Markdown, Fingerprint, Languages
@@ -98,7 +97,7 @@ post at drain time, so a post unpublished in the meantime becomes a delete.
 
 ## Distribution
 
-Prod builds carry `src/Updater.php`, which hooks WordPress's own update-transient mechanism and polls a static
-manifest at `github.com/…/releases/latest/download/personaizer.json`; `--dev` builds (dev URLs) and `--org` builds
-(wordpress.org serves updates) strip it. `build-zip.sh` guards that the source defaults to production and that
-the header, `PERSONAIZER_VERSION` and readme `Stable tag` agree; `release.sh` cuts the GitHub release.
+The plugin is listed on WordPress.org as `personaizer-chat`, which is the only update channel; the plugin has
+no update code of its own. `build-zip.sh` guards that the source defaults to production, that the header,
+`PERSONAIZER_VERSION` and readme `Stable tag` agree, and that no update hooks ship; `release.sh` commits the
+version to WordPress.org SVN and archives the same zip as a GitHub release. See [RELEASING.md](RELEASING.md).

@@ -5,7 +5,7 @@
  * the pure code reaches for get the smallest possible stand-ins.
  */
 define( 'ABSPATH', __DIR__ . '/' );
-define( 'PERSONAIZER_PLUGIN_DIR', dirname( __DIR__ ) . '/personaizer' );
+define( 'PERSONAIZER_PLUGIN_DIR', dirname( __DIR__ ) . '/personaizer-chat' );
 
 spl_autoload_register( static function ( $class ) {
     if ( strpos( $class, 'Personaizer\\' ) !== 0 ) return;

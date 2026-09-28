@@ -2,9 +2,7 @@
 <ruleset name="PERSONAIZER plugin">
 	<description>What the wordpress.org reviewers run (Plugin Check wraps these sniffs), minus style rules that fight the plugin's PSR-4 layout.</description>
 
-	<file>personaizer</file>
-	<!-- The self-hosted updater never ships to wordpress.org (the org build strips it). -->
-	<exclude-pattern>personaizer/src/Updater.php</exclude-pattern>
+	<file>personaizer-chat</file>
 
 	<arg name="extensions" value="php"/>
 	<arg name="colors"/>
@@ -37,7 +35,7 @@
 	</rule>
 	<!-- The view is include()d from Admin\Page::render(), so its variables are that function's locals, not globals. -->
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
-		<exclude-pattern>personaizer/src/Admin/views/*</exclude-pattern>
+		<exclude-pattern>personaizer-chat/src/Admin/views/*</exclude-pattern>
 	</rule>
 
 	<config name="minimum_supported_wp_version" value="5.6"/>

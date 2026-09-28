@@ -10,10 +10,10 @@ persona automatically — no paid account is needed to try it.
 
 ## Install
 
-- **From the WordPress.org plugin directory** (once approved): Plugins → Add New → search "PERSONAIZER"
-  → Install → Activate.
+- **From WordPress.org** ([personaizer-chat](https://wordpress.org/plugins/personaizer-chat/)): Plugins →
+  Add New → search "PERSONAIZER" → Install → Activate. Updates arrive the same way.
 - **From a release zip**: grab the latest from [Releases](../../releases), then in WordPress admin go to
-  Plugins → Add New → Upload Plugin, and install it from the zip.
+  Plugins → Add New → Upload Plugin. It is the same plugin, so it also updates from WordPress.org.
 
 ## Use it
 
@@ -40,8 +40,8 @@ those settings.
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the plugin is put together: the file map, the two backend
   auth modes, and how content sync/backfill/reconciliation fit together.
-- **[RELEASING.md](RELEASING.md)** — the WordPress.org submission process and how to ship a new version.
-- The plugin's own `readme.txt` (inside `personaizer/`, bundled in every release zip) is the
+- **[RELEASING.md](RELEASING.md)** — the WordPress.org listing and how to ship a new version.
+- The plugin's own `readme.txt` (inside `personaizer-chat/`, bundled in every release zip) is the
   WordPress.org-facing feature list, FAQ, and changelog.
 - **[testing/](testing/)** — a turnkey kit for validating the plugin against a real public WordPress site
   (LocalWP can't exercise image sync, Connect's PKCE callback, WP-Cron, or CORS — see
@@ -50,10 +50,11 @@ those settings.
 ## Repo layout
 
 ```
-personaizer/     the plugin itself — this folder's contents are exactly what ships in the zip
-build-zip.sh           packages personaizer/ into an installable zip (prod / --dev / --org builds)
-release.sh              cuts the GitHub release — the zip and the update manifest, as one release
-testing/                 kit for testing against a real public site + the WooCommerce sample catalog
+personaizer-chat/  the plugin itself (the WordPress.org slug) — its contents are exactly what ships
+.wordpress-org/     listing images (icons, banners) that release.sh puts in SVN assets/
+build-zip.sh        packages personaizer-chat/ into an installable zip (prod / --dev)
+release.sh          releases a version: WordPress.org SVN, then a GitHub release as the archive
+testing/            kit for testing against a real public site + the WooCommerce sample catalog
 ```
 
 ## License
