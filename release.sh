@@ -88,7 +88,7 @@ svn cp -q trunk "tags/$VERSION"
 
 echo ""
 echo "WordPress.org changes for $VERSION:"
-svn status | grep -v "^A[[:space:]]*+*[[:space:]]*tags/$VERSION/" || true
+svn status | grep -vE "^A[[:space:]]*[[:space:]]tags[/\\]$VERSION[/\\]" || true
 
 if [ -n "$DRY_RUN" ]; then
     echo ""
