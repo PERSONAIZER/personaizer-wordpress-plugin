@@ -37,6 +37,12 @@
     },
     "plan": {
       "name": "Test Plan",
+      "monthly_price": null,
+      "currency": "USD",
+      "resets_at": null,
+      "credits_used": 0,
+      "credits_limit": null,
+      "credits_per_conversation": 40,
       "knowledge_units_used": 120,
       "knowledge_units_limit": 2000
     },
@@ -48,6 +54,8 @@
         "source_id": "<guid>",
         "document_count": 0,
         "ready_count": 0,
+        "failed_count": 0,
+        "status": "ready",
         "last_reconcile": null
       },
       {
@@ -57,6 +65,8 @@
         "source_id": "<guid>",
         "document_count": 0,
         "ready_count": 0,
+        "failed_count": 0,
+        "status": "ready",
         "last_reconcile": null
       }
     ]

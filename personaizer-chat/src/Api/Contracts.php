@@ -41,14 +41,16 @@ final class Contracts {
 	 *   status:string,
 	 *   brand:array{id:string,name:string},
 	 *   persona:?array{id:string,name:string,avatar_url:string,building:bool},
-	 *   plan:array{name:string,knowledge_units_used:float,knowledge_units_limit:?float},
-	 *   streams:array<string,array{enabled:bool,type:string,source_id:string,document_count:int,ready_count:int,last_reconcile:?array}>
+	 *   plan:?array{name:string,monthly_price:?float,currency:string,resets_at:string,credits_used:int,credits_limit:?int,
+	 *     credits_per_conversation:int,knowledge_units_used:float,knowledge_units_limit:?float},
+	 *   streams:array<string,array{enabled:bool,type:string,source_id:string,document_count:int,ready_count:int,failed_count:int,
+	 *     status:string,last_reconcile:?array}>
 	 * }
 	 */
 	public static function sync_response( array $body ) {
 		$brand   = is_array( $body['brand'] ?? null ) ? $body['brand'] : array();
 		$persona = is_array( $body['persona'] ?? null ) ? $body['persona'] : null;
-		$plan    = is_array( $body['plan'] ?? null ) ? $body['plan'] : array();
+		$plan    = is_array( $body['plan'] ?? null ) ? $body['plan'] : null;
 
 		$streams = array();
 		foreach ( (array) ( $body['streams'] ?? array() ) as $row ) {
@@ -62,6 +64,9 @@ final class Contracts {
 				'source_id'      => (string) ( $row['source_id'] ?? '' ),
 				'document_count' => (int) ( $row['document_count'] ?? 0 ),
 				'ready_count'    => (int) ( $row['ready_count'] ?? 0 ),
+				'failed_count'   => (int) ( $row['failed_count'] ?? 0 ),
+				// The dashboard's own status: queued / reading / writing / indexing / mapping / summarizing / ready.
+				'status'         => (string) ( $row['status'] ?? '' ),
 				'last_reconcile' => $r === null ? null : array(
 					'generation'   => (int) ( $r['generation'] ?? 0 ),
 					'missing'      => (int) ( $r['missing'] ?? 0 ),
@@ -84,11 +89,20 @@ final class Contracts {
 				'avatar_url' => (string) ( $persona['avatar_url'] ?? '' ),
 				'building'   => ! empty( $persona['building'] ),
 			),
-			'plan'    => array(
-				'name'                  => (string) ( $plan['name'] ?? '' ),
-				'knowledge_units_used'  => (float) ( $plan['knowledge_units_used'] ?? 0 ),
+			'plan'    => $plan === null ? null : array(
+				'name'                     => (string) ( $plan['name'] ?? '' ),
+				// 0 on the free plan; null when the plan has no monthly price.
+				'monthly_price'            => isset( $plan['monthly_price'] ) ? (float) $plan['monthly_price'] : null,
+				'currency'                 => (string) ( $plan['currency'] ?? 'USD' ),
+				// When the credits start over (and a paid plan renews); '' when they never reset.
+				'resets_at'                => (string) ( $plan['resets_at'] ?? '' ),
+				'credits_used'             => (int) ( $plan['credits_used'] ?? 0 ),
+				// null (not 0) = unlimited, like the knowledge limit below.
+				'credits_limit'            => isset( $plan['credits_limit'] ) ? (int) $plan['credits_limit'] : null,
+				'credits_per_conversation' => (int) ( $plan['credits_per_conversation'] ?? 0 ),
+				'knowledge_units_used'     => (float) ( $plan['knowledge_units_used'] ?? 0 ),
 				// null (not 0) = unlimited — an absent ceiling must never read as "no room".
-				'knowledge_units_limit' => isset( $plan['knowledge_units_limit'] ) && $plan['knowledge_units_limit'] !== null
+				'knowledge_units_limit'    => isset( $plan['knowledge_units_limit'] ) && $plan['knowledge_units_limit'] !== null
 					? (float) $plan['knowledge_units_limit'] : null,
 			),
 			'streams' => $streams,
@@ -97,6 +111,9 @@ final class Contracts {
 
 	/** Whether the plan has room for more knowledge, as of a sync answer. Unknown reads as "yes". */
 	public static function has_headroom( array $sync ) {
+		if ( $sync['plan'] === null ) {
+			return true;
+		}
 		$limit = $sync['plan']['knowledge_units_limit'];
 		return $limit === null || $sync['plan']['knowledge_units_used'] < $limit;
 	}

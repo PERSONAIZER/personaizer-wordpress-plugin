@@ -26,6 +26,19 @@
         } );
     } );
 
+    // The ⓘ on the plan opens what each action costs in credits; a click elsewhere or Escape closes it.
+    var info = document.querySelector( '[data-pz-credits]' );
+    var credits = document.querySelector( '.pz-credits' );
+    if ( info && credits ) {
+        var showCredits = function ( open ) {
+            credits.hidden = ! open;
+            info.setAttribute( 'aria-expanded', String( open ) );
+        };
+        info.addEventListener( 'click', function ( e ) { e.stopPropagation(); showCredits( credits.hidden ); } );
+        document.addEventListener( 'click', function ( e ) { if ( ! credits.contains( e.target ) ) showCredits( false ); } );
+        document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) showCredits( false ); } );
+    }
+
     var connect = document.querySelector( '[data-pz-connect]' );
     if ( ! connect ) return;
     var away = false;

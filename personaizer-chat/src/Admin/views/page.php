@@ -18,10 +18,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	$state       = $model['state'];
 	$persona     = $state['persona'] ?? null;
-	$plan        = $state['plan'] ?? null;
+	$plan        = $model['plan'];
 	$sync_status = $state['status'] ?? '';
 	// Null when the API can't be reached and no earlier answer is stored.
 	$brand_name = $state['brand']['name'] ?? '';
+	$name       = $persona ? $persona['name'] : 'your persona';
 	// Rows of a stream that is off are not being sent — they wait for the owner to switch it on. Count them apart.
 	$queued   = 0;
 	$parked   = 0;
@@ -36,11 +37,74 @@ if ( ! defined( 'ABSPATH' ) ) {
 		$deferred += $stream['queue']['deferred'];
 		$failed   += $stream['queue']['failed'];
 	}
+
+	// Fixed icon markup, never data.
+	$icons = array(
+		'products'  => '<path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+		'pages'     => '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/>',
+		'posts'     => '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+		'web'       => '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.5 3.5 3.5 14.5 0 18M12 3c-3.5 3.5-3.5 14.5 0 18"/>',
+		'messenger' => '<path d="M12 3C7 3 3 6.7 3 11.3c0 2.6 1.3 4.9 3.3 6.4V21l3-1.7c.9.3 1.8.4 2.7.4 5 0 9-3.7 9-8.4S17 3 12 3z"/><path d="M7.5 13.5l3-3 2.5 2 3.5-3"/>',
+		'instagram' => '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6"/>',
+		'whatsapp'  => '<path d="M3.5 20.5l1.4-4.2A8.5 8.5 0 1 1 8 19.3z"/><path d="M9 8.5c-.4 3 3.4 6.8 6.5 6.5l.8-1.6-2-1-1 .9c-1.1-.5-2-1.4-2.6-2.5l.9-1-1-2z"/>',
+		'api'       => '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
+	);
+	$icon  = static function ( $key, $size ) use ( $icons ) {
+		return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $icons[ $key ] . '</svg>';
+	};
+	$coin  = static function ( $size ) {
+		return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#e8a317"/><circle cx="12" cy="12" r="8.2" fill="#fbc93d"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="#e8a317" stroke-width="1.4"/><path d="M8.5 8.2a5 5 0 0 1 4-1.6" stroke="#fff3c4" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
+	};
+	$allowed_svg = array(
+		'svg'    => array(
+			'width'           => true,
+			'height'          => true,
+			'viewbox'         => true,
+			'fill'            => true,
+			'stroke'          => true,
+			'stroke-width'    => true,
+			'stroke-linecap'  => true,
+			'stroke-linejoin' => true,
+			'aria-hidden'     => true,
+		),
+		'path'   => array(
+			'd'              => true,
+			'fill'           => true,
+			'stroke'         => true,
+			'stroke-width'   => true,
+			'stroke-linecap' => true,
+		),
+		'circle' => array(
+			'cx'           => true,
+			'cy'           => true,
+			'r'            => true,
+			'fill'         => true,
+			'stroke'       => true,
+			'stroke-width' => true,
+		),
+		'rect'   => array(
+			'x'      => true,
+			'y'      => true,
+			'width'  => true,
+			'height' => true,
+			'rx'     => true,
+		),
+	);
+	$status_words = array(
+		'queued'      => 'Waiting',
+		'reading'     => 'Reading',
+		'writing'     => 'Writing',
+		'indexing'    => 'Indexing',
+		'mapping'     => 'Mapping',
+		'summarizing' => 'Summarizing',
+	);
 	?>
 <div class="wrap pz-wrap">
-	<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="32" height="32">PERSONAIZER
-		<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
-			<span class="pz-pill pz-pill--on"><?php echo $persona ? 'Live on your site' : 'Connected'; ?></span>
+	<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="28" height="28">PERSONAIZER
+		<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' && $persona ) : ?>
+			<span class="pz-pill pz-pill--on"><span class="pz-pill__dot"></span>Live on your site</span>
+		<?php elseif ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
+			<span class="pz-pill pz-pill--warn"><span class="pz-pill__dot"></span>Not on your site yet</span>
 		<?php elseif ( $model['connected'] && $sync_status === 'disconnected' ) : ?>
 			<span class="pz-pill pz-pill--off">Frozen</span>
 		<?php elseif ( $model['connected'] && $sync_status === State::GONE ) : ?>
@@ -57,7 +121,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php endif; ?>
 
 	<?php if ( ! $model['connected'] ) : ?>
-		<div class="pz-card pz-card--hero pz-card--connect">
+		<div class="pz-card pz-card--connect">
 			<img class="pz-logo pz-logo--hero" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="72" height="72">
 			<h2>Connect this site to PERSONAIZER</h2>
 			<p>Your pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them. You'll pick the brand, the persona and what to sync on personaizer.com — the form is filled in from this site.</p>
@@ -65,195 +129,224 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 	<?php else : ?>
 
-		<div class="pz-card pz-card--hero">
-			<div class="pz-hero">
-				<?php if ( $persona ) : ?>
-					<div class="pz-avatar">
+		<?php if ( $sync_status === State::GONE ) : ?>
+			<div class="notice notice-warning inline"><p>This site's connection was removed on personaizer.com, so nothing syncs and the widget is off. <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>" data-pz-connect target="_blank">Connect</a> again to start over, or <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Clear this site's PERSONAIZER connection? Nothing on personaizer.com is touched.">clear the connection</a> here.</p></div>
+		<?php elseif ( $sync_status === 'disconnected' ) : ?>
+			<div class="notice notice-warning inline"><p>This site was disconnected on personaizer.com. Nothing was deleted; <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">connect</a> again to resume.</p></div>
+		<?php elseif ( ! $model['reachable'] ) : ?>
+			<div class="notice notice-error inline"><p>PERSONAIZER can't be reached right now
+			<?php
+			if ( $model['error'] ) :
+				?>
+				: <?php echo esc_html( $model['error']['message'] ); ?><?php endif; ?>. Changes are kept and sent when it's back.</p></div>
+		<?php elseif ( ! $persona ) : ?>
+			<div class="pz-banner">
+				<div class="pz-banner__text">
+					<strong>Turn on the chat widget</strong>
+					<span>Your content syncs into <?php echo esc_html( $brand_name ?: 'your brand' ); ?>, but visitors see no chat yet. Pick the persona that answers on this site on personaizer.com.</span>
+				</div>
+				<a class="button button-primary" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Pick a persona</a>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( $plan ) : ?>
+			<div class="pz-card pz-plan">
+				<div class="pz-plan__head">
+					<span><strong><?php echo esc_html( $plan['name'] ); ?> plan</strong>
 					<?php
-					if ( $persona['avatar_url'] !== '' ) :
+					if ( $plan['price'] !== '' ) :
 						?>
-						<img src="<?php echo esc_url( $persona['avatar_url'] ); ?>" alt=""><?php endif; ?></div>
-				<?php endif; ?>
-				<div class="pz-hero__text">
-					<h2><?php echo $persona ? esc_html( $persona['name'] ) : esc_html( $brand_name ?: 'Your brand' ); ?></h2>
-					<?php if ( $persona && $persona['building'] ) : ?>
-						<p class="pz-muted"><span class="spinner is-active pz-spinner"></span> Being built — the widget shows a "coming soon" state until it's ready.</p>
-					<?php elseif ( $persona ) : ?>
-						<p class="pz-muted">Answering on this site for <strong><?php echo esc_html( $brand_name ); ?></strong>.</p>
-					<?php elseif ( $sync_status === State::GONE ) : ?>
-						<p class="pz-muted">Nothing syncs and nothing is shown until this site is connected again.</p>
-					<?php else : ?>
-						<p class="pz-muted">Content syncs into <strong><?php echo esc_html( $brand_name ?: 'your brand' ); ?></strong>; no chat widget is on the site yet — pick a persona on personaizer.com.</p>
-					<?php endif; ?>
-					<?php if ( $plan && $plan['name'] !== '' ) : ?>
-						<p class="pz-muted pz-plan">
-							<?php echo esc_html( $plan['name'] ); ?> plan ·
-							<?php
-							if ( $plan['knowledge_units_limit'] === null ) :
-								?>
-								unlimited knowledge<?php else : ?>
-														<?php echo esc_html( number_format_i18n( $plan['knowledge_units_used'] ) ); ?> of <?php echo esc_html( number_format_i18n( $plan['knowledge_units_limit'] ) ); ?> knowledge units used
-														<?php
-														if ( $deferred > 0 ) :
-															?>
-										— <strong><?php echo (int) $deferred; ?> records are waiting for room</strong>; <a href="<?php echo esc_url( $model['app_url'] . '/billing' ); ?>" target="_blank" rel="noopener">upgrade</a><?php endif; ?>
+						<span class="pz-muted"> · <?php echo esc_html( $plan['price'] ); ?></span><?php endif; ?></span>
+					<a href="<?php echo esc_url( $model['app_url'] . '/subscription' ); ?>" target="_blank" rel="noopener">Change plan</a>
+				</div>
+				<div class="pz-meters">
+					<?php foreach ( array( 'Conversations' => $plan['conversations'], 'Knowledge' => $plan['knowledge'] ) as $label => $meter ) : ?>
+						<?php if ( $label === 'Knowledge' ) : ?>
+							<span class="pz-meters__divider"></span>
+						<?php endif; ?>
+						<div class="pz-meter">
+							<div class="pz-meter__head">
+								<span class="pz-muted"><?php echo esc_html( $label ); ?></span>
+								<span class="pz-meter__value"><strong><?php echo esc_html( $meter['value'] ); ?></strong>
+								<?php
+								if ( $meter['of'] !== '' ) :
+									?>
+									<span class="pz-muted"><?php echo esc_html( $meter['of'] ); ?></span><?php endif; ?>
+								<?php if ( $label === 'Conversations' ) : ?>
+									<button type="button" class="pz-info" data-pz-credits aria-expanded="false" aria-label="How credits are spent">i</button>
+								<?php endif; ?>
+								</span>
+							</div>
+							<?php if ( $meter['bar'] !== null ) : ?>
+								<div class="pz-bar"><div class="pz-bar__fill pz-bar__fill--<?php echo esc_attr( $label === 'Knowledge' ? 'neutral' : 'good' ); ?> <?php echo $meter['level'] !== '' ? 'pz-bar__fill--' . esc_attr( $meter['level'] ) : ''; ?>" style="width: <?php echo esc_attr( number_format( max( 0, min( 1, $meter['bar'] ) ) * 100, 1, '.', '' ) ); ?>%"></div></div>
 							<?php endif; ?>
-						</p>
-					<?php endif; ?>
+							<span class="pz-meter__sub"><?php echo esc_html( $meter['sub'] ); ?></span>
+						</div>
+					<?php endforeach; ?>
 				</div>
+				<div class="pz-credits" role="dialog" aria-label="Credits" hidden>
+					<div class="pz-credits__head"><?php echo wp_kses( $coin( 18 ), $allowed_svg ); ?><strong>Credits</strong></div>
+					<div class="pz-credits__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers a message</span>
+						<span class="pz-credits__channels">
+						<?php
+						foreach ( array(
+							'web'       => 'Website',
+							'messenger' => 'Messenger',
+							'instagram' => 'Instagram',
+							'whatsapp'  => 'WhatsApp',
+							'api'       => 'API',
+						) as $key => $title ) :
+							?>
+							<span title="<?php echo esc_attr( $title ); ?>"><?php echo wp_kses( $icon( $key, 14 ), $allowed_svg ); ?></span><?php endforeach; ?></span>
+						<span class="pz-credits__cost">10<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-credits__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers in a live call</span><span class="pz-muted">voice or 3D</span><span class="pz-beta">BETA</span>
+						<span class="pz-credits__cost">20<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-credits__row"><span>Your team's reply during a takeover</span>
+						<span class="pz-credits__cost">1<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-credits__row"><span>New persona from one-click setup</span>
+						<span class="pz-credits__cost">100<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<p class="pz-muted">A conversation is usually 4 answers ≈ 40 credits.<?php echo $plan['resets'] !== '' ? ' Resets on ' . esc_html( $plan['resets'] ) . '.' : ''; ?></p>
+				</div>
+			</div>
+		<?php endif; ?>
+
+		<div class="pz-columns">
+			<div class="pz-card">
+				<h2>What <?php echo esc_html( $name ); ?> knows about your site</h2>
+				<p class="pz-muted">Changes on your site reach <?php echo esc_html( $name ); ?> within seconds. Switch sources on and off on <a href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>.</p>
+				<div class="pz-sources">
+					<div class="pz-source pz-source--head"><span>Source</span><span>Items</span><span>Status</span><span class="pz-right">Last checked</span></div>
+					<?php foreach ( $model['streams'] as $stream ) : ?>
+						<?php
+						$q = $stream['queue'];
+						$c = $stream['check'];
+						?>
+						<div class="pz-source">
+							<div class="pz-source__name">
+								<span class="pz-source__icon"><?php echo wp_kses( $icon( $stream['icon'], 18 ), $allowed_svg ); ?></span>
+								<div>
+									<strong><?php echo esc_html( $stream['label'] ); ?></strong>
+									<?php if ( $stream['enabled'] && $q['queued'] ) : ?>
+										<span class="pz-tag"><?php echo (int) $q['queued']; ?> queued</span>
+									<?php elseif ( $q['queued'] ) : ?>
+										<span class="pz-tag" title="Waiting for the source to be switched on"><?php echo (int) $q['queued']; ?> waiting (off)</span>
+									<?php endif; ?>
+									<?php if ( $q['deferred'] ) : ?>
+										<span class="pz-tag pz-tag--warn"><?php echo (int) $q['deferred']; ?> plan full</span>
+									<?php endif; ?>
+									<?php if ( $q['failed'] ) : ?>
+										<span class="pz-tag pz-tag--err"><?php echo (int) $q['failed']; ?> refused</span>
+									<?php endif; ?>
+									<?php if ( $stream['failed'] ) : ?>
+										<span class="pz-tag pz-tag--err"><?php echo (int) $stream['failed']; ?> failed to index</span>
+									<?php endif; ?>
+								</div>
+							</div>
+							<span><?php echo esc_html( number_format_i18n( $stream['enabled'] ? (int) $stream['synced'] : (int) $stream['local'] ) ); ?></span>
+							<span>
+								<?php if ( ! $stream['offered'] ) : ?>
+									<span class="pz-muted">Not switched on</span>
+								<?php elseif ( ! $stream['enabled'] ) : ?>
+									<span class="pz-badge">Off</span>
+								<?php elseif ( $stream['status'] === 'ready' ) : ?>
+									<span class="pz-badge pz-badge--on">Ready</span>
+								<?php else : ?>
+									<span class="pz-badge"><span class="spinner is-active pz-spinner"></span><?php echo esc_html( $status_words[ $stream['status'] ] ?? 'Syncing' ); ?></span>
+								<?php endif; ?>
+							</span>
+							<span class="pz-right pz-muted">
+								<?php if ( $c && isset( $c['error'] ) ) : ?>
+									Failed: <?php echo esc_html( $c['error'] ); ?>
+								<?php elseif ( $c ) : ?>
+									<?php echo esc_html( Page::ago( (int) $c['at'] ) ); ?>
+								<?php elseif ( $stream['enabled'] ) : ?>
+									never
+								<?php endif; ?>
+							</span>
+						</div>
+					<?php endforeach; ?>
+				</div>
+				<p class="pz-muted pz-status-line">
+					<?php
+					if ( $model['backfill']['running'] ) :
+						?>
+						<span class="spinner is-active pz-spinner"></span> Queuing everything that already exists (<?php echo (int) $model['backfill']['enqueued']; ?> so far)…
+						<?php
+					elseif ( $model['reconcile']['running'] ) :
+						?>
+						<span class="spinner is-active pz-spinner"></span> Checking <?php echo esc_html( $model['reconcile']['stream'] ?: 'sources' ); ?>…
+						<?php
+					elseif ( $queued > 0 ) :
+						?>
+						<span class="spinner is-active pz-spinner"></span> Sending <?php echo (int) $queued; ?> records…
+						<?php
+					else :
+						?>
+						Last sent <?php echo esc_html( Page::ago( $model['last_push'] ) ); ?>.<?php endif; ?>
+					<?php
+					if ( $deferred > 0 ) :
+						?>
+						<strong><?php echo (int) $deferred; ?> records are waiting for room</strong> — <a href="<?php echo esc_url( $model['app_url'] . '/subscription' ); ?>" target="_blank" rel="noopener">upgrade</a>.<?php endif; ?>
+					<?php
+					if ( $model['cron_off'] ) :
+						?>
+						<br><em>WP-Cron is disabled on this site — make sure a system cron calls wp-cron.php, or syncing only happens while someone is in wp-admin.</em><?php endif; ?>
+				</p>
+				<?php if ( $model['failures'] ) : ?>
+					<details class="pz-failures"><summary><?php echo (int) $failed; ?> records were refused — retried daily</summary>
+						<ul>
+						<?php
+						foreach ( $model['failures'] as $f ) :
+							?>
+							<li><code><?php echo esc_html( $f->external_id ); ?></code> — <?php echo esc_html( $f->last_error ); ?></li><?php endforeach; ?></ul>
+					</details>
+				<?php endif; ?>
 				<?php if ( $sync_status !== State::GONE ) : ?>
-				<div class="pz-hero__actions">
-					<a class="button button-primary" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Open in PERSONAIZER</a>
-				</div>
+					<p class="pz-actions"><a class="button" href="<?php echo esc_url( Page::action_url( Flow::ACTION_SYNC_NOW ) ); ?>">Sync now</a></p>
 				<?php endif; ?>
 			</div>
-			<?php if ( $sync_status === State::GONE ) : ?>
-				<div class="notice notice-warning inline"><p>This site's connection was removed on personaizer.com, so nothing syncs and the widget is off. <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>" data-pz-connect target="_blank">Connect</a> again to start over, or <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Clear this site's PERSONAIZER connection? Nothing on personaizer.com is touched.">clear the connection</a> here.</p></div>
-			<?php elseif ( $sync_status === 'disconnected' ) : ?>
-				<div class="notice notice-warning inline"><p>This site was disconnected on personaizer.com. Nothing was deleted; <a href="<?php echo esc_url( Page::action_url( Flow::ACTION_CONNECT ) ); ?>">connect</a> again to resume.</p></div>
-			<?php elseif ( ! $model['reachable'] ) : ?>
-				<div class="notice notice-error inline"><p>PERSONAIZER can't be reached right now
-				<?php
-				if ( $model['error'] ) :
-					?>
-					: <?php echo esc_html( $model['error']['message'] ); ?><?php endif; ?>. Changes are kept and sent when it's back.</p></div>
-			<?php endif; ?>
-		</div>
 
-		<div class="pz-card">
-			<h2>What it learns from this site</h2>
-			<?php if ( $sync_status !== State::GONE ) : ?>
-			<p class="pz-muted">Switch streams on and off on <a href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>. New and edited content keeps syncing by itself.</p>
-			<?php endif; ?>
-			<table class="widefat striped pz-streams">
-				<thead><tr><th>Stream</th><th>Status</th><th>Synced</th><th>Waiting</th><th>Last check</th></tr></thead>
-				<tbody>
-				<?php foreach ( $model['streams'] as $key => $stream ) : ?>
-					<tr>
-						<td><strong><?php echo esc_html( $stream['label'] ); ?></strong> <span class="pz-muted"><?php echo (int) $stream['local']; ?> published</span></td>
-						<td>
+			<div class="pz-rail">
+				<div class="pz-card">
+					<div class="pz-persona">
+						<div class="pz-avatar">
 						<?php
-						if ( $stream['enabled'] ) :
+						if ( $persona && $persona['avatar_url'] !== '' ) :
 							?>
-							<span class="pz-dot pz-dot--on"></span> On
-							<?php
-elseif ( $stream['offered'] ) :
-	?>
-							<span class="pz-dot"></span> Off
-							<?php
-else :
-	?>
-	<span class="pz-muted">Not switched on</span><?php endif; ?></td>
-						<td>
-						<?php
-						if ( $stream['synced'] !== null ) :
-							?>
-							<?php echo (int) $stream['synced']; ?> of <?php echo (int) $stream['local']; ?>
-							<?php
-							if ( $stream['ready'] !== null && $stream['ready'] < $stream['synced'] ) :
-								?>
-							<span class="pz-muted">(<?php echo (int) $stream['ready']; ?> ready)</span><?php endif; ?>
-							<?php
-else :
-	?>
-	—<?php endif; ?></td>
-						<td>
-							<?php $q = $stream['queue']; ?>
-							<?php
-							if ( $q['queued'] && $stream['enabled'] ) :
-								?>
-								<span class="pz-tag"><?php echo (int) $q['queued']; ?> queued</span>
-								<?php
-elseif ( $q['queued'] ) :
-	?>
-								<span class="pz-tag" title="Waiting for the stream to be switched on"><?php echo (int) $q['queued']; ?> waiting (off)</span><?php endif; ?>
-							<?php
-							if ( $q['deferred'] ) :
-								?>
-								<span class="pz-tag pz-tag--warn"><?php echo (int) $q['deferred']; ?> plan full</span><?php endif; ?>
-							<?php
-							if ( $q['failed'] ) :
-								?>
-								<span class="pz-tag pz-tag--err"><?php echo (int) $q['failed']; ?> failed</span><?php endif; ?>
-							<?php
-							if ( ! $q['queued'] && ! $q['deferred'] && ! $q['failed'] ) :
-								?>
-								<span class="pz-muted">—</span><?php endif; ?>
-						</td>
-						<td class="pz-muted">
-							<?php $c = $stream['check']; ?>
-							<?php
-							if ( $c && isset( $c['error'] ) ) :
-								?>
-								Failed: <?php echo esc_html( $c['error'] ); ?>
-								<?php
-							elseif ( $c ) :
-								?>
-								<?php echo esc_html( Page::ago( (int) $c['at'] ) ); ?>
-								<?php
-								if ( $c['missing'] || $c['stale'] ) :
-									?>
-								· <?php echo (int) ( $c['missing'] + $c['stale'] ); ?> to send<?php endif; ?>
-								<?php
-								if ( $c['orphans_held'] ) :
-									?>
-	· <?php echo (int) $c['orphans_held']; ?> awaiting removal<?php endif; ?>
-								<?php
-							else :
-								?>
-								never<?php endif; ?>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
-			<p class="pz-muted pz-status-line">
-				<?php
-				if ( $model['backfill']['running'] ) :
-					?>
-					<span class="spinner is-active pz-spinner"></span> Queuing everything that already exists (<?php echo (int) $model['backfill']['enqueued']; ?> so far)…
-					<?php
-				elseif ( $model['reconcile']['running'] ) :
-					?>
-					<span class="spinner is-active pz-spinner"></span> Checking <?php echo esc_html( $model['reconcile']['stream'] ?: 'streams' ); ?>…
-					<?php
-				elseif ( $queued > 0 ) :
-					?>
-					<span class="spinner is-active pz-spinner"></span> Sending <?php echo (int) $queued; ?> records…
-					<?php
-				else :
-					?>
-					Last sent <?php echo esc_html( Page::ago( $model['last_push'] ) ); ?>.<?php endif; ?>
-				<?php
-				if ( $model['cron_off'] ) :
-					?>
-					<br><em>WP-Cron is disabled on this site — make sure a system cron calls wp-cron.php, or syncing only happens while someone is in wp-admin.</em><?php endif; ?>
-			</p>
-			<?php if ( $model['failures'] ) : ?>
-				<details class="pz-failures"><summary><?php echo (int) $failed; ?> records were refused — retried daily</summary>
-					<ul>
-					<?php
-					foreach ( $model['failures'] as $f ) :
-						?>
-						<li><code><?php echo esc_html( $f->external_id ); ?></code> — <?php echo esc_html( $f->last_error ); ?></li><?php endforeach; ?></ul>
-				</details>
-			<?php endif; ?>
-			<p class="pz-actions">
-				<?php if ( $sync_status !== State::GONE ) : ?>
-				<a class="button" href="<?php echo esc_url( Page::action_url( Flow::ACTION_SYNC_NOW ) ); ?>">Sync now</a>
-				<?php endif; ?>
-				<a class="button pz-danger" href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Disconnect this site? The widget and syncing stop. Nothing is deleted on PERSONAIZER; connecting again resumes where you left off.">Disconnect</a>
-			</p>
-		</div>
+							<img src="<?php echo esc_url( $persona['avatar_url'] ); ?>" alt=""><?php endif; ?></div>
+						<div>
+							<strong class="pz-persona__name"><?php echo esc_html( $persona ? $persona['name'] : ( $brand_name ?: 'Your brand' ) ); ?></strong>
+							<?php if ( $persona && $persona['building'] ) : ?>
+								<span class="pz-muted"><span class="spinner is-active pz-spinner"></span>Being built</span>
+							<?php elseif ( $persona ) : ?>
+								<span class="pz-muted">Answers for <?php echo esc_html( $brand_name ?: get_bloginfo( 'name' ) ); ?></span>
+							<?php else : ?>
+								<span class="pz-muted">No persona on this site yet</span>
+							<?php endif; ?>
+						</div>
+					</div>
+					<?php if ( $sync_status !== State::GONE ) : ?>
+						<a class="button button-primary pz-block" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Open dashboard</a>
+					<?php endif; ?>
+					<?php if ( $persona ) : ?>
+						<a class="pz-block pz-center" href="<?php echo esc_url( $model['app_url'] . '/persona/' . $persona['id'] ); ?>" target="_blank" rel="noopener">Widget appearance</a>
+					<?php endif; ?>
+				</div>
 
-		<div class="pz-card">
-			<form method="post" action="options.php">
-				<?php settings_fields( 'personaizer' ); ?>
-				<h2>Visitors</h2>
-				<label><input type="checkbox" name="<?php echo esc_attr( Options::IDENTIFY_USERS ); ?>" value="1" <?php checked( Options::identify_users() ); ?>> Recognise signed-in customers in the chat, so the persona knows who it's talking to.</label>
-				<p class="pz-muted">Widget appearance, greeting and behaviour are edited on <a href="<?php echo esc_url( $model['app_url'] . ( $persona ? '/persona/' . $persona['id'] : '' ) ); ?>" target="_blank" rel="noopener">personaizer.com</a>.</p>
-				<?php submit_button( 'Save', 'secondary', 'submit', false ); ?>
-			</form>
+				<div class="pz-card">
+					<form method="post" action="options.php">
+						<?php settings_fields( 'personaizer' ); ?>
+						<h2>Visitors</h2>
+						<label class="pz-check"><input type="checkbox" name="<?php echo esc_attr( Options::IDENTIFY_USERS ); ?>" value="1" <?php checked( Options::identify_users() ); ?>>
+							<span><strong>Recognise signed-in customers</strong>
+							<span class="pz-muted">Signed-in customers skip the contact form: their name, email and phone come from their account.</span></span>
+						</label>
+						<?php submit_button( 'Save', 'secondary', 'submit', false ); ?>
+					</form>
+				</div>
+
+				<p class="pz-disconnect"><a href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Disconnect this site? The widget and syncing stop. Nothing is deleted on PERSONAIZER; connecting again resumes where you left off.">Disconnect this site</a></p>
+			</div>
 		</div>
 
 		<details class="pz-sysinfo"><summary>System info</summary>

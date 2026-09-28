@@ -79,6 +79,9 @@ final class Page {
 				'enabled' => $row !== null && $row['enabled'],
 				'synced'  => $row !== null ? $row['document_count'] : null,
 				'ready'   => $row !== null ? $row['ready_count'] : null,
+				'failed'  => $row !== null ? $row['failed_count'] : 0,
+				'status'  => $row !== null ? $row['status'] : '',
+				'icon'    => self::stream_icon( $key ),
 				'queue'   => $counts[ $key ] ?? array(
 					'queued'   => 0,
 					'deferred' => 0,
@@ -94,6 +97,7 @@ final class Page {
 			'reachable' => $state !== null,
 			'state'     => $state,
 			'streams'   => $streams,
+			'plan'      => $state !== null && $state['plan'] !== null ? self::plan_view( $state['plan'], $streams ) : null,
 			'backfill'  => $connected ? Backfill::progress() : array(
 				'running'  => false,
 				'enqueued' => 0,
@@ -176,6 +180,95 @@ final class Page {
 			);
 		}
 		return null;
+	}
+
+	/**
+	 * The plan panel, worked out: its head line, then conversations (credits shown as conversations, the raw credits
+	 * beneath) and knowledge (units used of the plan's, and what fills them). Bars turn amber at 20% left and red at
+	 * 10% — the dashboard's thresholds.
+	 *
+	 * @return array{name:string,price:string,resets:string,conversations:array,knowledge:array}
+	 */
+	private static function plan_view( array $plan, array $streams ) {
+		$resets = $plan['resets_at'] !== '' && strtotime( $plan['resets_at'] ) ? date_i18n( 'M j', strtotime( $plan['resets_at'] ) ) : '';
+		$price  = $plan['monthly_price'] !== null && $plan['monthly_price'] > 0
+			? self::money( $plan['monthly_price'], $plan['currency'] ) . ' / month' . ( $resets !== '' ? ' · renews ' . $resets : '' )
+			: '';
+
+		$limit = $plan['credits_limit'];
+		$per   = $plan['credits_per_conversation'];
+		if ( $limit === null ) {
+			$conversations = array(
+				'value' => 'Unlimited',
+				'of'    => '',
+				'bar'   => null,
+				'level' => '',
+				'sub'   => number_format_i18n( $plan['credits_used'] ) . ' credits used',
+			);
+		} else {
+			$left          = max( 0, $limit - $plan['credits_used'] );
+			$conversations = array(
+				'value' => $per > 0 ? '≈ ' . number_format_i18n( intdiv( $left, $per ) ) . ' left' : number_format_i18n( $left ) . ' credits left',
+				'of'    => $per > 0 ? 'of ≈ ' . number_format_i18n( intdiv( $limit, $per ) ) : '',
+				'bar'   => $limit > 0 ? $left / $limit : 0,
+				'level' => self::level( $left, $limit ),
+				'sub'   => number_format_i18n( $left ) . ' of ' . number_format_i18n( $limit ) . ' credits left · '
+					. number_format_i18n( $plan['credits_used'] ) . ' used' . ( $resets !== '' ? ' · resets ' . $resets : '' ),
+			);
+		}
+
+		$on     = array_filter( $streams, static function ( $s ) { return $s['enabled']; } );
+		$items  = array_sum( array_map( static function ( $s ) { return (int) $s['synced']; }, $on ) );
+		$filled = number_format_i18n( $items ) . ' items from ' . count( $on ) . ( count( $on ) === 1 ? ' source' : ' sources' );
+		$used   = $plan['knowledge_units_used'];
+		$cap    = $plan['knowledge_units_limit'];
+
+		return array(
+			'name'          => $plan['name'],
+			'price'         => $price,
+			'resets'        => $resets,
+			'conversations' => $conversations,
+			'knowledge'     => $cap === null ? array(
+				'value' => number_format_i18n( round( $used ) ),
+				'of'    => 'units · unlimited',
+				'bar'   => null,
+				'level' => '',
+				'sub'   => $filled,
+			) : array(
+				'value' => number_format_i18n( round( $used ) ),
+				'of'    => 'of ' . number_format_i18n( $cap ) . ' units',
+				'bar'   => $cap > 0 ? $used / $cap : 0,
+				'level' => self::level( $cap - $used, $cap ),
+				'sub'   => number_format_i18n( max( 0, round( $cap - $used ) ) ) . ' free · ' . $filled,
+			),
+		);
+	}
+
+	/** '', 'warning' at 20% or less left, 'critical' at 10% or less. */
+	private static function level( $left, $limit ) {
+		if ( $limit <= 0 ) {
+			return '';
+		}
+		$share = $left / $limit;
+		return $share <= 0.1 ? 'critical' : ( $share <= 0.2 ? 'warning' : '' );
+	}
+
+	private static function money( $amount, $currency ) {
+		$symbols = array(
+			'USD' => '$',
+			'EUR' => '€',
+			'GBP' => '£',
+		);
+		$number  = number_format_i18n( $amount, floor( $amount ) == $amount ? 0 : 2 ); // phpcs:ignore Universal.Operators.StrictComparisons -- a float compared with its floor
+		return isset( $symbols[ $currency ] ) ? $symbols[ $currency ] . $number : $number . ' ' . $currency;
+	}
+
+	/** Which icon a stream's row shows: products, posts, or a page for everything else. */
+	private static function stream_icon( $key ) {
+		if ( $key === 'products' ) {
+			return 'products';
+		}
+		return $key === 'posts' ? 'posts' : 'pages';
 	}
 
 	/** Ago-text for a unix time. */

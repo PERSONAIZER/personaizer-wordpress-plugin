@@ -34,6 +34,9 @@ final class ContractsTest extends TestCase {
         $this->assertFalse( $sync['persona']['building'] );
         $this->assertSame( 'Test Plan', $sync['plan']['name'] );
         $this->assertSame( 2000.0, $sync['plan']['knowledge_units_limit'] );
+        $this->assertNull( $sync['plan']['credits_limit'], 'no credit ceiling reads as unlimited, never as 0' );
+        $this->assertSame( 40, $sync['plan']['credits_per_conversation'] );
+        $this->assertSame( 'USD', $sync['plan']['currency'] );
         $this->assertTrue( Contracts::has_headroom( $sync ) );
         $this->assertSame( array( 'pages', 'products' ), array_keys( $sync['streams'] ) );
         $this->assertTrue( $sync['streams']['pages']['enabled'] );
@@ -41,6 +44,8 @@ final class ContractsTest extends TestCase {
         $this->assertSame( 'catalog', $sync['streams']['products']['type'] );
         $this->assertSame( '<guid>', $sync['streams']['products']['source_id'] );
         $this->assertNull( $sync['streams']['products']['last_reconcile'] );
+        $this->assertSame( 'ready', $sync['streams']['pages']['status'] );
+        $this->assertSame( 0, $sync['streams']['pages']['failed_count'] );
 
         $frozen = Contracts::sync_response( pz_fixture( 'sync.disconnected' )['response'] );
         $this->assertSame( 'disconnected', $frozen['status'] );
