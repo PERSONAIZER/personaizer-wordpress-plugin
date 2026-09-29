@@ -48,6 +48,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		'instagram' => '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6"/>',
 		'whatsapp'  => '<path d="M3.5 20.5l1.4-4.2A8.5 8.5 0 1 1 8 19.3z"/><path d="M9 8.5c-.4 3 3.4 6.8 6.5 6.5l.8-1.6-2-1-1 .9c-1.1-.5-2-1.4-2.6-2.5l.9-1-1-2z"/>',
 		'api'       => '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
+		'stack'     => '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5"/>',
 	);
 	$icon  = static function ( $key, $size ) use ( $icons ) {
 		return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $icons[ $key ] . '</svg>';
@@ -100,21 +101,43 @@ if ( ! defined( 'ABSPATH' ) ) {
 	);
 	?>
 <div class="wrap pz-wrap">
-	<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="28" height="28">PERSONAIZER
-		<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' && $persona ) : ?>
-			<span class="pz-pill pz-pill--on"><span class="pz-pill__dot"></span>Live on your site</span>
-		<?php elseif ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
-			<span class="pz-pill pz-pill--warn"><span class="pz-pill__dot"></span>Not on your site yet</span>
-		<?php elseif ( $model['connected'] && $sync_status === 'disconnected' ) : ?>
-			<span class="pz-pill pz-pill--off">Frozen</span>
-		<?php elseif ( $model['connected'] && $sync_status === State::GONE ) : ?>
-			<span class="pz-pill pz-pill--off">Removed on personaizer.com</span>
-		<?php elseif ( $model['connected'] ) : ?>
-			<span class="pz-pill pz-pill--off">Can't reach PERSONAIZER</span>
-		<?php else : ?>
-			<span class="pz-pill">Not connected</span>
+	<div class="pz-head">
+		<h1 class="pz-title"><img class="pz-logo" src="<?php echo esc_url( $model['logo'] ); ?>" alt="" width="28" height="28">PERSONAIZER
+			<?php if ( $model['connected'] && $model['reachable'] && $sync_status === 'active' && $persona ) : ?>
+				<span class="pz-pill pz-pill--on"><span class="pz-pill__dot"></span>Live on your site</span>
+			<?php elseif ( $model['connected'] && $model['reachable'] && $sync_status === 'active' ) : ?>
+				<span class="pz-pill pz-pill--warn"><span class="pz-pill__dot"></span>Not on your site yet</span>
+			<?php elseif ( $model['connected'] && $sync_status === 'disconnected' ) : ?>
+				<span class="pz-pill pz-pill--off">Frozen</span>
+			<?php elseif ( $model['connected'] && $sync_status === State::GONE ) : ?>
+				<span class="pz-pill pz-pill--off">Removed on personaizer.com</span>
+			<?php elseif ( $model['connected'] ) : ?>
+				<span class="pz-pill pz-pill--off">Can't reach PERSONAIZER</span>
+			<?php else : ?>
+				<span class="pz-pill">Not connected</span>
+			<?php endif; ?>
+		</h1>
+		<?php if ( $model['connected'] && $sync_status !== State::GONE ) : ?>
+			<div class="pz-head__persona">
+				<?php if ( $persona ) : ?>
+					<div class="pz-avatar">
+					<?php
+					if ( $persona['avatar_url'] !== '' ) :
+						?>
+						<img src="<?php echo esc_url( $persona['avatar_url'] ); ?>" alt=""><?php endif; ?></div>
+					<div class="pz-head__text">
+						<strong><?php echo esc_html( $persona['name'] ); ?></strong>
+						<?php if ( $persona['building'] ) : ?>
+							<span class="pz-muted"><span class="spinner is-active pz-spinner"></span>Being built</span>
+						<?php else : ?>
+							<span class="pz-muted">Answers for <?php echo esc_html( $brand_name ?: get_bloginfo( 'name' ) ); ?></span>
+						<?php endif; ?>
+					</div>
+				<?php endif; ?>
+				<a class="button button-primary" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Open dashboard</a>
+			</div>
 		<?php endif; ?>
-	</h1>
+	</div>
 
 	<?php if ( $model['notice'] ) : ?>
 		<div class="notice notice-<?php echo esc_attr( $model['notice']['kind'] ); ?> is-dismissible"><p><?php echo esc_html( $model['notice']['text'] ); ?></p></div>
@@ -154,40 +177,55 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<div class="pz-plan__head">
 					<span><strong><?php echo esc_html( $plan['name'] ); ?> plan</strong>
 					<?php
-					if ( $plan['price'] !== '' ) :
+					if ( $plan['gives'] !== '' ) :
 						?>
-						<span class="pz-muted"> · <?php echo esc_html( $plan['price'] ); ?></span><?php endif; ?></span>
+						<span class="pz-muted"> · <?php echo esc_html( $plan['gives'] ); ?></span><?php endif; ?></span>
 					<a href="<?php echo esc_url( $model['app_url'] . '/subscription' ); ?>" target="_blank" rel="noopener">Change plan</a>
 				</div>
 				<div class="pz-meters">
-					<?php foreach ( array( 'Conversations' => $plan['conversations'], 'Knowledge' => $plan['knowledge'] ) as $label => $meter ) : ?>
-						<?php if ( $label === 'Knowledge' ) : ?>
+					<?php
+					foreach ( array(
+						'Conversations' => array( 'conversations', 'credits', 'How credits are spent' ),
+						'Knowledge'     => array( 'knowledge', 'knowledge', 'What a knowledge unit is' ),
+					) as $label => list( $key, $pop, $pop_label ) ) :
+						$meter = $plan[ $key ];
+						?>
+						<?php if ( $key === 'knowledge' ) : ?>
 							<span class="pz-meters__divider"></span>
 						<?php endif; ?>
 						<div class="pz-meter">
 							<div class="pz-meter__head">
 								<span class="pz-muted"><?php echo esc_html( $label ); ?></span>
-								<span class="pz-meter__value"><strong><?php echo esc_html( $meter['value'] ); ?></strong>
+								<span class="pz-meter__value"><strong class="<?php echo $meter['over'] ? 'pz-over' : ''; ?>"><?php echo esc_html( $meter['value'] ); ?></strong>
 								<?php
 								if ( $meter['of'] !== '' ) :
 									?>
 									<span class="pz-muted"><?php echo esc_html( $meter['of'] ); ?></span><?php endif; ?>
-								<?php if ( $label === 'Conversations' ) : ?>
-									<button type="button" class="pz-info" data-pz-credits aria-expanded="false" aria-label="How credits are spent">i</button>
-								<?php endif; ?>
+									<button type="button" class="pz-info" data-pz-pop="<?php echo esc_attr( $pop ); ?>" aria-expanded="false" aria-label="<?php echo esc_attr( $pop_label ); ?>">i</button>
 								</span>
 							</div>
 							<?php if ( $meter['bar'] !== null ) : ?>
-								<div class="pz-bar"><div class="pz-bar__fill pz-bar__fill--<?php echo esc_attr( $label === 'Knowledge' ? 'neutral' : 'good' ); ?> <?php echo $meter['level'] !== '' ? 'pz-bar__fill--' . esc_attr( $meter['level'] ) : ''; ?>" style="width: <?php echo esc_attr( number_format( max( 0, min( 1, $meter['bar'] ) ) * 100, 1, '.', '' ) ); ?>%"></div></div>
+								<div class="pz-bar"><div class="pz-bar__fill" style="width: <?php echo esc_attr( number_format( $meter['bar']['fill'], 1, '.', '' ) ); ?>%"></div>
+								<?php
+								if ( $meter['bar']['at'] !== null ) :
+									?>
+									<div class="pz-bar__over"></div><?php endif; ?></div>
+								<?php if ( $meter['bar']['at'] !== null ) : ?>
+									<div class="pz-bar__limit" style="left: <?php echo esc_attr( number_format( $meter['bar']['at'], 1, '.', '' ) ); ?>%"><span class="pz-bar__tick"></span><span class="pz-bar__label"><?php echo esc_html( $meter['bar']['limit'] ); ?></span></div>
+								<?php endif; ?>
 							<?php endif; ?>
-							<span class="pz-meter__sub"><?php echo esc_html( $meter['sub'] ); ?></span>
+							<?php foreach ( $meter['lines'] as list( $text, $over ) ) : ?>
+								<span class="pz-meter__sub<?php echo $over ? ' pz-over' : ''; ?>"><?php echo esc_html( $text ); ?></span>
+							<?php endforeach; ?>
 						</div>
 					<?php endforeach; ?>
 				</div>
-				<div class="pz-credits" role="dialog" aria-label="Credits" hidden>
-					<div class="pz-credits__head"><?php echo wp_kses( $coin( 18 ), $allowed_svg ); ?><strong>Credits</strong></div>
-					<div class="pz-credits__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers a message</span>
-						<span class="pz-credits__channels">
+				<div class="pz-pop pz-pop--credits" data-pz-popover="credits" role="dialog" aria-label="Credits" hidden>
+					<div class="pz-pop__head"><?php echo wp_kses( $coin( 18 ), $allowed_svg ); ?><strong>Credits</strong></div>
+					<div class="pz-pop__row"><span>Your team's reply during a takeover</span>
+						<span class="pz-pop__amount">1<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-pop__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers a message</span>
+						<span class="pz-pop__channels">
 						<?php
 						foreach ( array(
 							'web'       => 'Website',
@@ -195,27 +233,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 							'instagram' => 'Instagram',
 							'whatsapp'  => 'WhatsApp',
 							'api'       => 'API',
-						) as $key => $title ) :
+						) as $channel => $title ) :
 							?>
-							<span title="<?php echo esc_attr( $title ); ?>"><?php echo wp_kses( $icon( $key, 14 ), $allowed_svg ); ?></span><?php endforeach; ?></span>
-						<span class="pz-credits__cost">10<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
-					<div class="pz-credits__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers in a live call</span><span class="pz-muted">voice or 3D</span><span class="pz-beta">BETA</span>
-						<span class="pz-credits__cost">20<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
-					<div class="pz-credits__row"><span>Your team's reply during a takeover</span>
-						<span class="pz-credits__cost">1<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
-					<div class="pz-credits__row"><span>New persona from one-click setup</span>
-						<span class="pz-credits__cost">100<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+							<span title="<?php echo esc_attr( $title ); ?>"><?php echo wp_kses( $icon( $channel, 14 ), $allowed_svg ); ?></span><?php endforeach; ?></span>
+						<span class="pz-pop__amount">10<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-pop__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers in a live call</span><span class="pz-muted">voice or 3D</span><span class="pz-beta">BETA</span>
+						<span class="pz-pop__amount">20<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<div class="pz-pop__row"><span>New persona from one-click setup</span>
+						<span class="pz-pop__amount">100<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
 					<p class="pz-muted">A conversation is usually 4 answers ≈ 40 credits.<?php echo $plan['resets'] !== '' ? ' Resets on ' . esc_html( $plan['resets'] ) . '.' : ''; ?></p>
+				</div>
+				<div class="pz-pop pz-pop--knowledge" data-pz-popover="knowledge" role="dialog" aria-label="Knowledge units" hidden>
+					<div class="pz-pop__head"><span class="pz-pop__icon"><?php echo wp_kses( $icon( 'stack', 18 ), $allowed_svg ); ?></span><strong>Knowledge units</strong></div>
+					<div class="pz-pop__row"><span>A product</span><span class="pz-muted">long descriptions count more</span><span class="pz-pop__amount">≈ 1</span></div>
+					<div class="pz-pop__row"><span>A page or post</span><span class="pz-pop__amount">1 per ~1,800 characters</span></div>
+					<div class="pz-pop__row"><span>A PDF or document</span><span class="pz-pop__amount">1 per ~1.5 pages</span></div>
+					<div class="pz-pop__row"><span>An image</span><span class="pz-pop__amount">1</span></div>
+					<p class="pz-muted">Units count what <?php echo esc_html( $name ); ?> knows now. They don't reset each month; removing content frees them.</p>
 				</div>
 			</div>
 		<?php endif; ?>
 
 		<div class="pz-columns">
 			<div class="pz-card">
-				<h2>What <?php echo esc_html( $name ); ?> knows about your site</h2>
-				<p class="pz-muted">Changes on your site reach <?php echo esc_html( $name ); ?> within seconds. Switch sources on and off on <a href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>.</p>
+				<div class="pz-knows__head">
+					<h2>What <?php echo esc_html( $name ); ?> knows about your site</h2>
+					<?php if ( $model['any_full'] ) : ?>
+						<a class="button button-primary" href="<?php echo esc_url( $model['app_url'] . '/subscription' ); ?>" target="_blank" rel="noopener">Upgrade for room</a>
+					<?php endif; ?>
+				</div>
+				<p class="pz-muted">Changes on your site reach <?php echo esc_html( $name ); ?> within seconds<?php echo $model['any_full'] ? ' — while the plan has room' : ''; ?>. Switch sources on and off on <a href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">personaizer.com</a>.</p>
 				<div class="pz-sources">
-					<div class="pz-source pz-source--head"><span>Source</span><span>Items</span><span>Status</span><span class="pz-right">Last checked</span></div>
+					<div class="pz-source pz-source--head"><span>Source</span><span>Known to <?php echo esc_html( $name ); ?></span><span>Status</span><span class="pz-right">Last checked</span></div>
 					<?php foreach ( $model['streams'] as $stream ) : ?>
 						<?php
 						$q = $stream['queue'];
@@ -231,9 +280,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 									<?php elseif ( $q['queued'] ) : ?>
 										<span class="pz-tag" title="Waiting for the source to be switched on"><?php echo (int) $q['queued']; ?> waiting (off)</span>
 									<?php endif; ?>
-									<?php if ( $q['deferred'] ) : ?>
-										<span class="pz-tag pz-tag--warn"><?php echo (int) $q['deferred']; ?> plan full</span>
-									<?php endif; ?>
 									<?php if ( $q['failed'] ) : ?>
 										<span class="pz-tag pz-tag--err"><?php echo (int) $q['failed']; ?> refused</span>
 									<?php endif; ?>
@@ -242,12 +288,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 									<?php endif; ?>
 								</div>
 							</div>
-							<span><?php echo esc_html( number_format_i18n( $stream['enabled'] ? (int) $stream['synced'] : (int) $stream['local'] ) ); ?></span>
+							<?php if ( $stream['enabled'] ) : ?>
+								<?php
+								$total = max( $stream['local'], (int) $stream['synced'] );
+								$share = $total > 0 ? max( (int) $stream['synced'] > 0 ? 1.5 : 0, (int) $stream['synced'] / $total * 100 ) : 0;
+								?>
+								<div class="pz-known">
+									<span><strong><?php echo esc_html( number_format_i18n( (int) $stream['synced'] ) ); ?></strong> <span class="pz-muted">of <?php echo esc_html( number_format_i18n( $total ) ); ?> known</span></span>
+									<div class="pz-known__bar"><div class="pz-known__fill<?php echo $stream['full'] ? ' pz-known__fill--full' : ''; ?>" style="width: <?php echo esc_attr( number_format( $share, 1, '.', '' ) ); ?>%"></div></div>
+								</div>
+							<?php else : ?>
+								<span class="pz-muted"><?php echo esc_html( number_format_i18n( (int) $stream['local'] ) ); ?> on your site</span>
+							<?php endif; ?>
 							<span>
 								<?php if ( ! $stream['offered'] ) : ?>
 									<span class="pz-muted">Not switched on</span>
 								<?php elseif ( ! $stream['enabled'] ) : ?>
 									<span class="pz-badge">Off</span>
+								<?php elseif ( $stream['full'] ) : ?>
+									<span class="pz-badge pz-badge--full">Plan full</span>
 								<?php elseif ( $stream['status'] === 'ready' ) : ?>
 									<span class="pz-badge pz-badge--on">Ready</span>
 								<?php else : ?>
@@ -308,41 +367,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 			<div class="pz-rail">
 				<div class="pz-card">
-					<div class="pz-persona">
-						<div class="pz-avatar">
-						<?php
-						if ( $persona && $persona['avatar_url'] !== '' ) :
-							?>
-							<img src="<?php echo esc_url( $persona['avatar_url'] ); ?>" alt=""><?php endif; ?></div>
-						<div>
-							<strong class="pz-persona__name"><?php echo esc_html( $persona ? $persona['name'] : ( $brand_name ?: 'Your brand' ) ); ?></strong>
-							<?php if ( $persona && $persona['building'] ) : ?>
-								<span class="pz-muted"><span class="spinner is-active pz-spinner"></span>Being built</span>
-							<?php elseif ( $persona ) : ?>
-								<span class="pz-muted">Answers for <?php echo esc_html( $brand_name ?: get_bloginfo( 'name' ) ); ?></span>
-							<?php else : ?>
-								<span class="pz-muted">No persona on this site yet</span>
-							<?php endif; ?>
-						</div>
-					</div>
-					<?php if ( $sync_status !== State::GONE ) : ?>
-						<a class="button button-primary pz-block" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Open dashboard</a>
-					<?php endif; ?>
-					<?php if ( $persona ) : ?>
-						<a class="pz-block pz-center" href="<?php echo esc_url( $model['app_url'] . '/persona/' . $persona['id'] ); ?>" target="_blank" rel="noopener">Widget appearance</a>
-					<?php endif; ?>
-				</div>
-
-				<div class="pz-card">
 					<form method="post" action="options.php">
 						<?php settings_fields( 'personaizer' ); ?>
 						<h2>Visitors</h2>
 						<label class="pz-check"><input type="checkbox" name="<?php echo esc_attr( Options::IDENTIFY_USERS ); ?>" value="1" <?php checked( Options::identify_users() ); ?>>
 							<span><strong>Recognise signed-in customers</strong>
-							<span class="pz-muted">Signed-in customers skip the contact form: their name, email and phone come from their account.</span></span>
+							<span class="pz-muted">They skip the contact form: name, email and phone come from their account.</span></span>
 						</label>
 						<?php submit_button( 'Save', 'secondary', 'submit', false ); ?>
 					</form>
+				</div>
+
+				<div class="pz-card">
+					<?php if ( $persona ) : ?>
+						<h2>Chat widget <span class="pz-badge pz-badge--on">On</span></h2>
+						<p class="pz-muted">The chat bubble shows on every page of your site.</p>
+						<a class="button pz-block" href="<?php echo esc_url( $model['app_url'] . '/persona/' . $persona['id'] ); ?>" target="_blank" rel="noopener">Widget appearance</a>
+					<?php else : ?>
+						<h2>Chat widget <span class="pz-badge">Off</span></h2>
+						<p class="pz-muted">Visitors don't see the chat yet.</p>
+						<a class="button button-primary pz-block" href="<?php echo esc_url( $model['dashboard'] ); ?>" target="_blank" rel="noopener">Pick a persona</a>
+					<?php endif; ?>
 				</div>
 
 				<p class="pz-disconnect"><a href="<?php echo esc_url( Page::action_url( Flow::ACTION_DISCONNECT ) ); ?>" data-pz-confirm="Disconnect this site? The widget and syncing stop. Nothing is deleted on PERSONAIZER; connecting again resumes where you left off.">Disconnect this site</a></p>

@@ -26,18 +26,24 @@
         } );
     } );
 
-    // The ⓘ on the plan opens what each action costs in credits; a click elsewhere or Escape closes it.
-    var info = document.querySelector( '[data-pz-credits]' );
-    var credits = document.querySelector( '.pz-credits' );
-    if ( info && credits ) {
-        var showCredits = function ( open ) {
-            credits.hidden = ! open;
+    // Each ⓘ on the plan opens its box (credits, knowledge units); another ⓘ, a click elsewhere or Escape closes it.
+    var infos = document.querySelectorAll( '[data-pz-pop]' );
+    var showPop = function ( name ) {
+        infos.forEach( function ( info ) {
+            var box = document.querySelector( '[data-pz-popover="' + info.getAttribute( 'data-pz-pop' ) + '"]' );
+            var open = info.getAttribute( 'data-pz-pop' ) === name;
+            if ( box ) box.hidden = ! open;
             info.setAttribute( 'aria-expanded', String( open ) );
-        };
-        info.addEventListener( 'click', function ( e ) { e.stopPropagation(); showCredits( credits.hidden ); } );
-        document.addEventListener( 'click', function ( e ) { if ( ! credits.contains( e.target ) ) showCredits( false ); } );
-        document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) showCredits( false ); } );
-    }
+        } );
+    };
+    infos.forEach( function ( info ) {
+        info.addEventListener( 'click', function ( e ) {
+            e.stopPropagation();
+            showPop( info.getAttribute( 'aria-expanded' ) === 'true' ? null : info.getAttribute( 'data-pz-pop' ) );
+        } );
+    } );
+    document.addEventListener( 'click', function ( e ) { if ( ! e.target.closest( '[data-pz-popover]' ) ) showPop( null ); } );
+    document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) showPop( null ); } );
 
     var connect = document.querySelector( '[data-pz-connect]' );
     if ( ! connect ) return;

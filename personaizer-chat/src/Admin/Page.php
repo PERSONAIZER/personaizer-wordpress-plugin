@@ -92,11 +92,21 @@ final class Page {
 			);
 		}
 
+		// The plan kept some of a source out: records wait for room, or knowledge is over its limit and not everything is in.
+		$sync_plan = $state !== null ? $state['plan'] : null;
+		$ku_over   = $sync_plan !== null && $sync_plan['knowledge_units_limit'] !== null
+			&& $sync_plan['knowledge_units_used'] > $sync_plan['knowledge_units_limit'];
+		foreach ( $streams as $key => $stream ) {
+			$streams[ $key ]['full'] = $stream['enabled'] && $stream['status'] === 'ready'
+				&& ( $stream['queue']['deferred'] > 0 || ( $ku_over && (int) $stream['synced'] < $stream['local'] ) );
+		}
+
 		return array(
 			'connected' => $connected,
 			'reachable' => $state !== null,
 			'state'     => $state,
 			'streams'   => $streams,
+			'any_full'  => (bool) array_filter( array_column( $streams, 'full' ) ),
 			'plan'      => $state !== null && $state['plan'] !== null ? self::plan_view( $state['plan'], $streams ) : null,
 			'backfill'  => $connected ? Backfill::progress() : array(
 				'running'  => false,
@@ -183,74 +193,137 @@ final class Page {
 	}
 
 	/**
-	 * The plan panel, worked out: its head line, then conversations (credits shown as conversations, the raw credits
-	 * beneath) and knowledge (units used of the plan's, and what fills them). Bars turn amber at 20% left and red at
-	 * 10% — the dashboard's thresholds.
+	 * The plan panel, worked out: what the plan gives, then conversations (credits shown as conversations) and knowledge
+	 * (units the persona holds of the plan's). Both bars are drawn to what was used; past a limit, the part over is
+	 * marked and the lines say how far over and what that means.
 	 *
-	 * @return array{name:string,price:string,resets:string,conversations:array,knowledge:array}
+	 * @return array{name:string,gives:string,resets:string,conversations:array,knowledge:array}
 	 */
 	private static function plan_view( array $plan, array $streams ) {
 		$resets = $plan['resets_at'] !== '' && strtotime( $plan['resets_at'] ) ? date_i18n( 'M j', strtotime( $plan['resets_at'] ) ) : '';
-		$price  = $plan['monthly_price'] !== null && $plan['monthly_price'] > 0
-			? self::money( $plan['monthly_price'], $plan['currency'] ) . ' / month' . ( $resets !== '' ? ' · renews ' . $resets : '' )
-			: '';
+		$paid   = $plan['monthly_price'] !== null && $plan['monthly_price'] > 0;
+		$per    = $plan['credits_per_conversation'];
+		$limit  = $plan['credits_limit'];
+		$used   = $plan['credits_used'];
+		$cap    = $plan['knowledge_units_limit'];
+		$held   = $plan['knowledge_units_used'];
 
-		$limit = $plan['credits_limit'];
-		$per   = $plan['credits_per_conversation'];
+		$gives = array();
+		if ( $paid ) {
+			$gives[] = self::money( $plan['monthly_price'], $plan['currency'] ) . ' / month';
+		}
+		$allowance = array();
+		if ( $limit !== null ) {
+			$allowance[] = number_format_i18n( $limit ) . ' credits' . ( $per > 0 ? ' (≈ ' . number_format_i18n( intdiv( $limit, $per ) ) . ' conversations)' : '' );
+		}
+		if ( $cap !== null ) {
+			$allowance[] = number_format_i18n( $cap ) . ' knowledge units';
+		}
+		if ( $allowance ) {
+			$gives[] = implode( ' and ', $allowance );
+		}
+		if ( $resets !== '' ) {
+			$gives[] = ( $paid ? 'renews ' : 'resets ' ) . $resets;
+		}
+
 		if ( $limit === null ) {
-			$conversations = array(
-				'value' => 'Unlimited',
-				'of'    => '',
-				'bar'   => null,
-				'level' => '',
-				'sub'   => number_format_i18n( $plan['credits_used'] ) . ' credits used',
+			$conversations = self::meter( 'Unlimited', '', false, null, array( array( number_format_i18n( $used ) . ' credits used', false ) ) );
+		} elseif ( $used >= $limit ) {
+			$conversations = self::meter(
+				'None left',
+				'',
+				true,
+				self::bar( $used, $limit ),
+				array(
+					array( number_format_i18n( $used ) . ' credits used of ' . number_format_i18n( $limit ) . ( $used > $limit ? ' · ' . number_format_i18n( $used - $limit ) . ' over' : '' ), true ),
+					array( 'Answers are paused until ' . ( $resets !== '' ? $resets . ' or ' : '' ) . 'an upgrade. Your team can still reply.', false ),
+				)
 			);
 		} else {
-			$left          = max( 0, $limit - $plan['credits_used'] );
-			$conversations = array(
-				'value' => $per > 0 ? '≈ ' . number_format_i18n( intdiv( $left, $per ) ) . ' left' : number_format_i18n( $left ) . ' credits left',
-				'of'    => $per > 0 ? 'of ≈ ' . number_format_i18n( intdiv( $limit, $per ) ) : '',
-				'bar'   => $limit > 0 ? $left / $limit : 0,
-				'level' => self::level( $left, $limit ),
-				'sub'   => number_format_i18n( $left ) . ' of ' . number_format_i18n( $limit ) . ' credits left · '
-					. number_format_i18n( $plan['credits_used'] ) . ' used' . ( $resets !== '' ? ' · resets ' . $resets : '' ),
+			$left          = $limit - $used;
+			$conversations = self::meter(
+				$per > 0 ? '≈ ' . number_format_i18n( intdiv( $left, $per ) ) . ' left' : number_format_i18n( $left ) . ' credits left',
+				$per > 0 ? 'of ≈ ' . number_format_i18n( intdiv( $limit, $per ) ) : '',
+				false,
+				self::bar( $used, $limit ),
+				array( array( number_format_i18n( $left ) . ' of ' . number_format_i18n( $limit ) . ' credits left · ' . number_format_i18n( $used ) . ' used' . ( $resets !== '' ? ' · resets ' . $resets : '' ), false ) )
 			);
 		}
 
-		$on     = array_filter( $streams, static function ( $s ) { return $s['enabled']; } );
-		$items  = array_sum( array_map( static function ( $s ) { return (int) $s['synced']; }, $on ) );
+		$on      = array_filter(
+			$streams,
+			static function ( $s ) {
+				return $s['enabled'];
+			}
+		);
+		$items   = 0;
+		$waiting = 0;
+		foreach ( $on as $s ) {
+			$items   += (int) $s['synced'];
+			$waiting += max( 0, $s['local'] - (int) $s['synced'] );
+		}
 		$filled = number_format_i18n( $items ) . ' items from ' . count( $on ) . ( count( $on ) === 1 ? ' source' : ' sources' );
-		$used   = $plan['knowledge_units_used'];
-		$cap    = $plan['knowledge_units_limit'];
+		if ( $cap === null ) {
+			$knowledge = self::meter( number_format_i18n( round( $held ) ), 'units · unlimited', false, null, array( array( $filled, false ) ) );
+		} elseif ( $held > $cap ) {
+			$knowledge = self::meter(
+				number_format_i18n( round( $held ) ),
+				'of ' . number_format_i18n( $cap ) . ' units',
+				true,
+				self::bar( $held, $cap ),
+				array(
+					array( number_format_i18n( round( $held - $cap ) ) . ' over' . ( $waiting > 0 ? ' · ' . number_format_i18n( $waiting ) . ' items waiting for room' : '' ), true ),
+					array( "New and changed content isn't learned until you upgrade or remove some.", false ),
+				)
+			);
+		} else {
+			$knowledge = self::meter(
+				number_format_i18n( round( $held ) ),
+				'of ' . number_format_i18n( $cap ) . ' units',
+				false,
+				self::bar( $held, $cap ),
+				array( array( number_format_i18n( max( 0, round( $cap - $held ) ) ) . ' free · ' . $filled, false ) )
+			);
+		}
 
 		return array(
 			'name'          => $plan['name'],
-			'price'         => $price,
+			'gives'         => implode( ' · ', $gives ),
 			'resets'        => $resets,
 			'conversations' => $conversations,
-			'knowledge'     => $cap === null ? array(
-				'value' => number_format_i18n( round( $used ) ),
-				'of'    => 'units · unlimited',
-				'bar'   => null,
-				'level' => '',
-				'sub'   => $filled,
-			) : array(
-				'value' => number_format_i18n( round( $used ) ),
-				'of'    => 'of ' . number_format_i18n( $cap ) . ' units',
-				'bar'   => $cap > 0 ? $used / $cap : 0,
-				'level' => self::level( $cap - $used, $cap ),
-				'sub'   => number_format_i18n( max( 0, round( $cap - $used ) ) ) . ' free · ' . $filled,
-			),
+			'knowledge'     => $knowledge,
 		);
 	}
 
-	/** '', 'warning' at 20% or less left, 'critical' at 10% or less. */
-	private static function level( $left, $limit ) {
-		if ( $limit <= 0 ) {
-			return '';
+	/** @return array{value:string,of:string,over:bool,bar:?array,lines:array} */
+	private static function meter( $value, $of, $over, $bar, array $lines ) {
+		return array(
+			'value' => $value,
+			'of'    => $of,
+			'over'  => $over,
+			'bar'   => $bar,
+			'lines' => $lines,
+		);
+	}
+
+	/**
+	 * A bar drawn to what was used: filled up to the limit; past it, where the limit sits and the part over.
+	 *
+	 * @return array{fill:float,at:?float,limit:string}
+	 */
+	private static function bar( $used, $limit ) {
+		if ( $used <= $limit ) {
+			return array(
+				'fill'  => $limit > 0 ? $used / $limit * 100 : 0,
+				'at'    => null,
+				'limit' => '',
+			);
 		}
-		$share = $left / $limit;
-		return $share <= 0.1 ? 'critical' : ( $share <= 0.2 ? 'warning' : '' );
+		return array(
+			'fill'  => $limit / $used * 100,
+			'at'    => $limit / $used * 100,
+			'limit' => 'limit ' . number_format_i18n( $limit ),
+		);
 	}
 
 	private static function money( $amount, $currency ) {
