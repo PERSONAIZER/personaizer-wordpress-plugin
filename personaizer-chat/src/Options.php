@@ -68,8 +68,9 @@ final class Options {
 		return trim( (string) get_option( self::IDENTITY_SECRET, '' ) );
 	}
 
+	/** Signed-in customers skip the widget's contact form. On until the owner unticks it (saved as ''). */
 	public static function identify_users() {
-		return get_option( self::IDENTIFY_USERS, '' ) === '1';
+		return get_option( self::IDENTIFY_USERS, '1' ) === '1';
 	}
 
 	/** Remember why the last call failed, in the owner's words, so the admin page can explain a stalled sync. */
