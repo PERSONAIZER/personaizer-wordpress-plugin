@@ -43,8 +43,10 @@
 .pz-bar__fill { height: 6px; background: #1f6fd9; }
 .pz-bar__over { flex: 1; background: repeating-linear-gradient(135deg, #dc3848 0 4px, #ffffff 4px 8px); }
 .pz-bar__limit { position: relative; height: 14px; font-size: 11px; color: #8c8f94; font-variant-numeric: tabular-nums; }
-.pz-bar__tick { position: absolute; left: 0; top: -12px; width: 2px; height: 10px; background: #1d2327; }
-.pz-bar__label { position: absolute; left: -20px; top: 1px; white-space: nowrap; }
+.pz-bar__tick { position: absolute; top: -12px; width: 2px; height: 10px; margin-left: -1px; background: #1d2327; }
+.pz-bar__label { position: absolute; top: 1px; white-space: nowrap; transform: translateX(-50%); }
+.pz-bar__label--start { transform: none; }
+.pz-bar__label--end { transform: translateX(-100%); }
 .pz-info { width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid #1f6fd9; background: #eaf3ff; color: #1741c9; font-size: 11px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; }
 .pz-info[aria-expanded="true"] { background: #1f6fd9; color: #fff; }
 

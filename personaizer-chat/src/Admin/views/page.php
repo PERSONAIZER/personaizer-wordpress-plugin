@@ -211,7 +211,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 									?>
 									<div class="pz-bar__over"></div><?php endif; ?></div>
 								<?php if ( $meter['bar']['at'] !== null ) : ?>
-									<div class="pz-bar__limit" style="left: <?php echo esc_attr( number_format( $meter['bar']['at'], 1, '.', '' ) ); ?>%"><span class="pz-bar__tick"></span><span class="pz-bar__label"><?php echo esc_html( $meter['bar']['limit'] ); ?></span></div>
+									<?php $pz_at = number_format( $meter['bar']['at'], 1, '.', '' ); ?>
+									<div class="pz-bar__limit"><span class="pz-bar__tick" style="left: <?php echo esc_attr( $pz_at ); ?>%"></span><span class="pz-bar__label<?php echo $meter['bar']['at'] > 85 ? ' pz-bar__label--end' : ( $meter['bar']['at'] < 15 ? ' pz-bar__label--start' : '' ); ?>" style="left: <?php echo esc_attr( $pz_at ); ?>%"><?php echo esc_html( $meter['bar']['limit'] ); ?></span></div>
 								<?php endif; ?>
 							<?php endif; ?>
 							<?php foreach ( $meter['lines'] as list( $text, $over ) ) : ?>
