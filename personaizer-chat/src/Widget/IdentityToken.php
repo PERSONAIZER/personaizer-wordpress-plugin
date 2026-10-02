@@ -69,14 +69,26 @@ final class IdentityToken {
 		}
 		return array_filter(
 			array(
-				'name'  => $user->display_name,
-				'email' => $user->user_email,
-				'phone' => (string) get_user_meta( $user->ID, 'billing_phone', true ),
+				'name'   => $user->display_name,
+				'email'  => $user->user_email,
+				'phone'  => (string) get_user_meta( $user->ID, 'billing_phone', true ),
+				'avatar' => self::avatar_url( $user->ID ),
 			),
 			static function ( $v ) {
 				return $v !== '' && $v !== null;
 			}
 		);
+	}
+
+	/**
+	 * The user's picture as WordPress shows it (a local avatar plugin's image, or their Gravatar — which is the site's
+	 * default avatar when they never uploaded one); '' when WordPress has none. https only and within the 255
+	 * characters the backend accepts.
+	 */
+	private static function avatar_url( $user_id ) {
+		$data = get_avatar_data( $user_id, array( 'size' => 192 ) );
+		$url  = ( ! empty( $data['found_avatar'] ) && ! empty( $data['url'] ) ) ? (string) $data['url'] : '';
+		return ( strpos( $url, 'https://' ) === 0 && strlen( $url ) <= 255 ) ? $url : '';
 	}
 
 	/** Minimal HS256 JWT. The key is the identity secret verbatim — the server verifies with the UTF-8 bytes of the same string. */
