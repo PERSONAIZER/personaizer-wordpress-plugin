@@ -72,9 +72,13 @@ final class Page {
 		$streams = array();
 		foreach ( Streams::all() as $key => $meta ) {
 			$row             = $state !== null && isset( $state['streams'][ $key ] ) ? $state['streams'][ $key ] : null;
+			$check           = $outcomes[ $key ] ?? null;
 			$streams[ $key ] = array(
 				'label'   => $meta['label'],
-				'local'   => Streams::published_count( $key ),
+				// What the site can send: the last full list's count — pages with text, sellable products. A cart or
+				// checkout page has none and is never sent, so counting it would read as two pages forever waiting.
+				// Until the first list ran, the published count is all there is.
+				'local'   => isset( $check['listed'] ) ? (int) $check['listed'] : Streams::published_count( $key ),
 				'offered' => $row !== null,
 				'enabled' => $row !== null && $row['enabled'],
 				'synced'  => $row !== null ? $row['document_count'] : null,
@@ -87,7 +91,7 @@ final class Page {
 					'deferred' => 0,
 					'failed'   => 0,
 				),
-				'check'   => $outcomes[ $key ] ?? null,
+				'check'   => $check,
 				'last'    => $row !== null ? $row['last_reconcile'] : null,
 			);
 		}

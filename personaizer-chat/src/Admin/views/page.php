@@ -319,6 +319,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 									Failed: <?php echo esc_html( $c['error'] ); ?>
 								<?php elseif ( $c ) : ?>
 									<?php echo esc_html( Page::ago( (int) $c['at'] ) ); ?>
+								<?php elseif ( ! empty( $stream['last']['at'] ) && strtotime( $stream['last']['at'] ) ) : ?>
+									<?php // This site's own record of the check is gone (or not written yet); PERSONAIZER kept its own. ?>
+									<?php echo esc_html( Page::ago( (int) strtotime( $stream['last']['at'] ) ) ); ?>
 								<?php elseif ( $stream['enabled'] ) : ?>
 									never
 								<?php endif; ?>
