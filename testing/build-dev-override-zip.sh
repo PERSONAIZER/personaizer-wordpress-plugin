@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Package testing/dev-override.php as an installable WordPress plugin.
 #
-#   testing/build-dev-override-zip.sh          # → dist/personaizer-dev-override.zip
+#   testing/build-dev-override-zip.sh          # → dist/personaizer-0-dev-override.zip
 #   testing/build-dev-override-zip.sh ~/Desktop
 #
 # Only needed when the test host gives you no way to write wp-content/mu-plugins/ — a TasteWP *temp*
@@ -17,7 +17,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$HERE/dev-override.php"
-SLUG="personaizer-dev-override"
+SLUG="personaizer-0-dev-override"  # sorts before personaizer-chat: WordPress loads active plugins alphabetically
 OUT_DIR="${1:-$HERE/../dist}"
 
 [ -f "$SRC" ] || { echo "error: $SRC not found" >&2; exit 1; }
@@ -54,6 +54,7 @@ fi
 echo "✓ built $(basename "$ZIP_PATH")"
 if command -v cygpath >/dev/null 2>&1; then echo "  zip  $(cygpath -w "$ZIP_PATH")"; else echo "  zip  $ZIP_PATH"; fi
 echo ""
-echo "Install it BEFORE the PERSONAIZER plugin — WordPress includes active plugins in ACTIVATION"
-echo "order, so the override only wins if it is activated first. Verify at PERSONAIZER -> System info:"
+echo "Upload and activate it with the PERSONAIZER plugin, in any order: WordPress loads active plugins"
+echo "alphabetically and this folder sorts first. Remove an old personaizer-dev-override first. Verify at"
+echo "PERSONAIZER -> System info:"
 echo "  API base : https://dev-api.personaizer.com"

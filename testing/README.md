@@ -20,7 +20,7 @@ So: test on a real public site. It doesn't need to cost anything.
 |------|-----|
 | `woocommerce-sample-products.csv` | The **official WooCommerce sample catalog** (~20 products — hoodies, tees, beanies, cap, sunglasses, belt; two variable products with colour/size variations; plus grouped/external/downloadable types). Realistic coverage, all images have proper `.jpg` URLs. (Same file WooCommerce ships at `wp-content/plugins/woocommerce/sample-data/`.) |
 | `dev-override.php` | **Ready-to-use** override, pre-filled for **dev**. Drop it into the test site's `wp-content/mu-plugins/`, or — on a host where you cannot reach the filesystem — install it as an ordinary plugin (next row). |
-| `build-dev-override-zip.sh` | Wraps that same file into an installable plugin zip (`dist/personaizer-dev-override.zip`) for hosts with no file access, such as a TasteWP **temp** site. |
+| `build-dev-override-zip.sh` | Wraps that same file into an installable plugin zip (`dist/personaizer-0-dev-override.zip`) for hosts with no file access, such as a TasteWP **temp** site. |
 | `.gitignore` | Only ignores built zips (artifacts) — see below. |
 
 The plugin **zip is not committed on purpose**: build it fresh with `build-zip.sh` each time. A
@@ -48,11 +48,12 @@ version guards exist to prevent.
    **Ordinary plugin**: when the host gives you no filesystem at all (a TasteWP *temp* site has no file
    manager and no SFTP).
    ```bash
-   testing/build-dev-override-zip.sh   # → dist/personaizer-dev-override.zip
+   testing/build-dev-override-zip.sh   # → dist/personaizer-0-dev-override.zip
    ```
-   Upload it and **activate it BEFORE the PERSONAIZER plugin**. This works only because the plugin declares
-   every constant behind `if(!defined())` and WordPress loads active plugins in *activation* order; activated
-   second, it does nothing. (Alphabetical order is not what decides this.)
+   Upload and activate it, in any order with the PERSONAIZER plugin. This works because the plugin declares
+   every constant behind `if(!defined())` and WordPress loads active plugins *alphabetically by folder*: the
+   zip's folder `personaizer-0-dev-override` sorts before `personaizer-chat`. (The old
+   `personaizer-dev-override` sorts after it and does nothing — delete it if it's installed.)
 
    Skip this step to test against **prod**: the plugin defaults to prod.
 

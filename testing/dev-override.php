@@ -19,9 +19,10 @@
  *   B. Ordinary plugin, when you cannot reach the filesystem at all (a TasteWP temp site).
  *      Run  testing/build-dev-override-zip.sh  and upload the result via Plugins → Add New → Upload.
  *      This works only because the PERSONAIZER plugin declares every constant behind an if(!defined())
- *      guard AND WordPress includes active plugins in ACTIVATION order — so this one must be ACTIVATED
- *      BEFORE the PERSONAIZER plugin. Activate it second and it is a silent no-op. Alphabetical order is
- *      not what decides this, so do not rely on the name.
+ *      guard AND WordPress loads active plugins in ALPHABETICAL order of their folder (it sorts the list on
+ *      every activation): the zip's folder, personaizer-0-dev-override, sorts before personaizer-chat, so
+ *      this loads first whatever order the two are activated in. Renamed, it would load second and do
+ *      nothing — the old name personaizer-dev-override sorts AFTER personaizer-chat.
  *
  * Either way, verify in PERSONAIZER → System info that the API base reads dev-api.personaizer.com.
  * When loaded as a mu-plugin it appears under Plugins → Must-Use.
