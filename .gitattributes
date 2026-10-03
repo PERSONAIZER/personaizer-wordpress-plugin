@@ -1,1 +1,4 @@
+# The plugin ships as written: LF on every machine, Windows included (build-zip.sh packs the working tree, and
+# WordPress.org's checks flag CRLF).
+personaizer-chat/** text=auto eol=lf
 fixtures/** text eol=lf

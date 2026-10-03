@@ -232,7 +232,7 @@ final class Outbox {
 		$rows = $wpdb->get_results(
 			$wpdb->prepare( 'SELECT stream, COUNT(*) AS n FROM %i WHERE op = %s AND state = %s GROUP BY stream', self::table(), self::UPSERT, self::QUEUED )
 		);
-		$out = array();
+		$out  = array();
 		foreach ( (array) $rows as $row ) {
 			$out[ $row->stream ] = (int) $row->n;
 		}

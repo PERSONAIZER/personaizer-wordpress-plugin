@@ -39,7 +39,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	}
 
 	// Fixed icon markup, never data.
-	$icons = array(
+	$icons        = array(
 		'products'  => '<path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
 		'pages'     => '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/>',
 		'posts'     => '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
@@ -50,13 +50,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 		'api'       => '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
 		'stack'     => '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5"/>',
 	);
-	$icon  = static function ( $key, $size ) use ( $icons ) {
+	$icon         = static function ( $key, $size ) use ( $icons ) {
 		return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $icons[ $key ] . '</svg>';
 	};
-	$coin  = static function ( $size ) {
+	$coin         = static function ( $size ) {
 		return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#e8a317"/><circle cx="12" cy="12" r="8.2" fill="#fbc93d"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="#e8a317" stroke-width="1.4"/><path d="M8.5 8.2a5 5 0 0 1 4-1.6" stroke="#fff3c4" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
 	};
-	$allowed_svg = array(
+	$allowed_svg  = array(
 		'svg'    => array(
 			'width'           => true,
 			'height'          => true,
