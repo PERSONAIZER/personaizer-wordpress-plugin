@@ -45,7 +45,7 @@ If your site holds more content than your PERSONAIZER plan's knowledge allowance
 
 = Recognise signed-in customers (optional) =
 
-The plugin can identify a signed-in WordPress user to the AI, so it can greet them by name and continue their previous conversations. When this is on, that customer's **name, email address and phone number** are sent to PERSONAIZER, signed with a per-site Identity Secret.
+The plugin can identify a signed-in WordPress user to the AI, so it can greet them by name and continue their previous conversations. When this is on, that customer's **name, email address, phone number and profile picture** are sent to PERSONAIZER, signed with a per-site Identity Secret.
 
 This is switched **off** by default — you can turn it on at any time in the plugin's settings. If you turn it on, disclose it in your site's privacy policy.
 
@@ -78,7 +78,7 @@ When you click Connect, you are sent to the PERSONAIZER consent screen to approv
 If you switch a stream on, the plugin sends the title, URL, text and image URLs of the published items in that stream so your AI can answer from them, and updates or removes them when you edit or delete that content. For WooCommerce products this also includes price, sale price, stock availability, SKU, attributes and categories, including per-variant values. Once a day it also sends the list of published items in each stream (ids and a checksum of each) so PERSONAIZER can tell what is missing, changed or gone. It reports which content types your site has, with counts, so you can switch streams on from personaizer.com, and reads your plan's knowledge allowance so it can tell you when your content exceeds it. This runs only for the streams you explicitly switch on.
 
 **5. Customer recognition (optional; `https://api.personaizer.com`)**
-If customer recognition is enabled, a signed-in WordPress user's name, email address and phone number are sent to PERSONAIZER, in a token signed with your site's Identity Secret, so the AI can recognise them. Nothing is sent for signed-out visitors. You can switch this off in the plugin's settings.
+If customer recognition is enabled, a signed-in WordPress user's name, email address, phone number and profile picture are sent to PERSONAIZER, in a token signed with your site's Identity Secret, so the AI can recognise them. Nothing is sent for signed-out visitors. It is off until you switch it on in the plugin's settings.
 
 Your use of PERSONAIZER is governed by:
 
@@ -237,6 +237,6 @@ Use **Disconnect** to clear every credential and setting the plugin stored, whil
 * Syncing is designed not to lose items: a rejected batch is retried item by item, anything that still doesn't land is queued and re-tried automatically, and an interrupted sync resumes on its own. When something hasn't synced, the plugin says why.
 * Removals made while a lane is switched off are queued, re-verified against the live site, and applied when that lane resumes.
 * Plan-aware syncing: content beyond your plan's knowledge allowance is reported clearly with an upgrade link, remembered, and synced automatically once the plan has room.
-* Optional recognition of signed-in customers, sending their name, email and phone in a token signed with a per-site Identity Secret.
+* Optional recognition of signed-in customers (off by default), sending their name, email, phone and picture in a token signed with a per-site Identity Secret.
 * Warns when your server is still running a cached copy of an older build, which would otherwise make an update appear to do nothing.
 * Disconnect and uninstall remove every credential, setting and scheduled task the plugin created.
