@@ -4,7 +4,7 @@ Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.4
+Stable tag: 3.1.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -134,8 +134,14 @@ Use **Disconnect** to clear every credential and setting the plugin stored, whil
 
 == Changelog ==
 
+= 3.1.5 =
+* First release on WordPress.org. The plugin lives in the `personaizer-chat` folder and updates through WordPress.org; if you installed an earlier zip, deactivate and delete it, then install this one and connect again.
+* Recognising signed-in customers is opt-in again: off until you turn it on. When on, the chat also gets their profile picture.
+* The PERSONAIZER page shows the persona in the title row, usage bars that can run past the plan's limit, and what each source knows ("X of Y known", counting what the site can send).
+* "Last checked" falls back to PERSONAIZER's own record when the site has none.
+
 = 3.1.4 =
-* First release on WordPress.org. The plugin now lives in the `personaizer-chat` folder and updates through WordPress.org; if you installed an earlier zip from GitHub, deactivate and delete it, then install this one and connect again.
+* The plugin moves to the `personaizer-chat` folder, ready for WordPress.org.
 
 = 3.1.3 =
 * Store facts no longer say "sells to every country" when that is only WooCommerce's default setting.
