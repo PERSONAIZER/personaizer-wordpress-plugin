@@ -1,6 +1,6 @@
-=== PERSONAIZER ===
+=== PERSONAIZER – AI Chatbot & Live Chat for WooCommerce ===
 Contributors: personaizer
-Tags: ai chatbot, live chat, chat widget, woocommerce, customer support
+Tags: ai chatbot, chatbot, live chat, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -8,9 +8,11 @@ Stable tag: 3.1.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connect your site to a PERSONAIZER AI persona in one click — a chat widget that answers from your own pages, posts and products.
+AI chatbot and live chat that answers visitors from your own pages, posts and WooCommerce products. Connect in one click, no API key.
 
 == Description ==
+
+Visitors ask the same questions every day, and the answers are already on your site. PERSONAIZER adds an AI chatbot to WordPress that answers them from your own pages, posts and WooCommerce products, recommends products, and says so when the answer isn't there. Your team sees every conversation and can take over the live chat at any time — on your site, Messenger, Instagram and WhatsApp.
 
 This plugin puts your PERSONAIZER AI persona on your WordPress site as a floating chat widget — and, if you want it to, teaches that persona your site's own content, so it answers from your real pages, posts and WooCommerce products instead of guessing.
 
@@ -45,7 +47,7 @@ If your site holds more content than your PERSONAIZER plan's knowledge allowance
 
 = Recognise signed-in customers (optional) =
 
-The plugin can identify a signed-in WordPress user to the AI, so it can greet them by name and continue their previous conversations. When this is on, that customer's **name, email address, phone number and profile picture** are sent to PERSONAIZER, signed with a per-site Identity Secret.
+The plugin can identify a signed-in WordPress user to the AI, so they skip the chat's contact form and continue their previous conversations. When this is on, that customer's **name, email address, phone number and profile picture** are sent to PERSONAIZER, signed with a per-site Identity Secret.
 
 This is switched **off** by default — you can turn it on at any time in the plugin's settings. If you turn it on, disclose it in your site's privacy policy.
 
@@ -105,6 +107,21 @@ Updates arrive through WordPress like any other plugin's; your connection is pre
 = Do I need a PERSONAIZER account? =
 Yes. You create and train your AI persona at personaizer.com, then connect this plugin to it. A free persona is enough to get started.
 
+= Do I need an OpenAI API key? =
+No. The AI runs on PERSONAIZER; you only connect the plugin to your account.
+
+= Is there a free plan? =
+Yes. A free persona with a monthly allowance of AI conversations is enough to try it on your site.
+
+= How is this different from ChatGPT? =
+It answers only from your own content — your pages, posts, products and the files you add — and says so when the answer isn't there, instead of making one up.
+
+= Can my team reply instead of the AI? =
+Yes. Every conversation shows up in the Chat Center on personaizer.com, and your team can take over any chat at any time, on your site, Messenger, Instagram and WhatsApp.
+
+= Does it work with WooCommerce? =
+Yes. Products sync as structured data — price, stock, variants, categories and images — and stock stays current in real time, so the AI recommends what you actually have.
+
 = Where do I change the widget's colour, position or greeting? =
 In your PERSONAIZER dashboard, on the persona's **Widget** tab — not in this plugin. Those settings belong to the persona so that every site and page it is embedded on stays consistent, and they take effect without any change in WordPress.
 
@@ -132,10 +149,20 @@ In WordPress it stores your integration key, brand and persona ids, your account
 = How do I remove everything? =
 Use **Disconnect** to clear every credential and setting the plugin stored, while keeping the plugin installed. Deleting the plugin removes the same data. Neither touches your persona or its knowledge on PERSONAIZER.
 
+== Screenshots ==
+
+1. One persona everywhere: your site, Messenger, Instagram and WhatsApp in one inbox.
+2. Answers with the right products — product cards with add to cart, right in the chat.
+3. Step in when a human matters: your team takes over any chat from the AI.
+4. Knows your brand inside out: your pages, posts and products, synced and kept current.
+5. Know what your shoppers want: top products, questions and the demand you don't cover yet.
+6. Let shoppers try it on: their own photo, wearing your product.
+7. See your persona at work right in WordPress: connection, sync status and plan.
+
 == Changelog ==
 
 = 3.1.5 =
-* First release on WordPress.org. The plugin lives in the `personaizer-chat` folder and updates through WordPress.org; if you installed an earlier zip, deactivate and delete it, then install this one and connect again.
+* First release on WordPress.org, with screenshots, banners and an expanded FAQ. The plugin lives in the `personaizer-chat` folder and updates through WordPress.org; if you installed an earlier zip, deactivate and delete it, then install this one and connect again.
 * Recognising signed-in customers is opt-in again: off until you turn it on. When on, the chat also gets their profile picture.
 * The PERSONAIZER page shows the persona in the title row, usage bars that can run past the plan's limit, and what each source knows ("X of Y known", counting what the site can send).
 * "Last checked" falls back to PERSONAIZER's own record when the site has none.

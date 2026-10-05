@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: PERSONAIZER
+ * Plugin Name: PERSONAIZER – AI Chatbot & Live Chat for WooCommerce
  * Plugin URI:  https://wordpress.org/plugins/personaizer-chat/
  * Description: Connect this site to PERSONAIZER: its pages, posts and products become what your AI persona knows, and the chat widget answers your visitors from them.
  * Version:     3.1.5
