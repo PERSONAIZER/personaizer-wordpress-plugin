@@ -13,7 +13,8 @@ final class Contracts {
 
 	// Problem codes the sync layer acts on. Everything else is "an error", retried later.
 	const CLOSED           = 'integration.closed';           // disconnected, or the stream is off / was never on — drop and re-sync
-	const QUOTA            = 'limits.quota_exceeded';         // the plan is full — keep the records for after an upgrade
+	// The plan is full — keep the records for after an upgrade. One code per quota; any other 402 counts too.
+	const QUOTA            = array( 'limits.knowledge_exhausted', 'limits.storage_exhausted' );
 	const STALE_GENERATION = 'integration.reconcile_stale_generation';
 
 	// ── connect ──

@@ -231,6 +231,6 @@ final class Client {
 			return false;
 		}
 		$data = $result->get_error_data();
-		return self::code( $result ) === Contracts::QUOTA || ( is_array( $data ) && (int) ( $data['status'] ?? 0 ) === 402 );
+		return in_array( self::code( $result ), Contracts::QUOTA, true ) || ( is_array( $data ) && (int) ( $data['status'] ?? 0 ) === 402 );
 	}
 }
