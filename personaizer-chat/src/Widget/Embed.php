@@ -41,7 +41,7 @@ final class Embed {
 			// Steer the widget's /v1 calls at the same environment as the API (overrides the base baked into chat.js).
 			'apiBase'     => rtrim( PERSONAIZER_WIDGET_API_BASE, '/' ),
 			// Conversations show as "WordPress" in the owner's inbox. Descriptive only — never a credential.
-			'integration' => 'wordpress',
+			'package'     => 'wordpress',
 		);
 
 		// Recognise a signed-in customer (opt-in + identity secret). Split in two for cache safety: display
