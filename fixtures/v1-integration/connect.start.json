@@ -8,8 +8,7 @@
     "site_profile": {
       "brand_name": "Example Shop",
       "audience_languages": [
-        "ka",
-        "en"
+        "ka"
       ],
       "logo_url": "https://shop.example.com/logo.png",
       "accent_colors": [

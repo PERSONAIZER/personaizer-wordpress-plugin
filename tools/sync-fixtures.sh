@@ -2,11 +2,11 @@
 # Copy the backend's recorded contract snapshots into this repo (or, with --check, verify they are identical).
 #
 # The backend's V1IntegrationContractTests records every exchange of the push surface — request, status, response —
-# under Tests/Api/Knowledge/Integration/Fixtures/v1-integration. tests/ContractsTest.php reads the copies here, so
+# under Tests/Personaizer.Core.ComponentTests/Knowledge/Fixtures/v1-integration. tests/ContractsTest.php reads the copies here, so
 # the plugin's readers are exercised against exactly what the API sends. Run this after the backend regenerates them.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="${PERSONAIZER_BACKEND:-$HERE/../personaizer-backend}/personaizer-core/Tests/Api/Knowledge/Integration/Fixtures/v1-integration"
+SRC="${PERSONAIZER_BACKEND:-$HERE/../personaizer-backend}/personaizer-core/Tests/Personaizer.Core.ComponentTests/Knowledge/Fixtures/v1-integration"
 DST="$HERE/fixtures/v1-integration"
 
 [ -d "$SRC" ] || { echo "error: backend fixtures not found at $SRC (set PERSONAIZER_BACKEND)" >&2; exit 1; }

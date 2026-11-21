@@ -224,7 +224,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<div class="pz-pop pz-pop--credits" data-pz-popover="credits" role="dialog" aria-label="Credits" hidden>
 					<div class="pz-pop__head"><?php echo wp_kses( $coin( 18 ), $allowed_svg ); ?><strong>Credits</strong></div>
 					<div class="pz-pop__row"><span>Your team's reply during a takeover</span>
-						<span class="pz-pop__amount">1<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+						<span class="pz-pop__amount"><?php echo esc_html( (string) $plan['costs']['chat_reply'] ); ?><?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
 					<div class="pz-pop__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers a message</span>
 						<span class="pz-pop__channels">
 						<?php
@@ -237,12 +237,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 						) as $channel => $title ) :
 							?>
 							<span title="<?php echo esc_attr( $title ); ?>"><?php echo wp_kses( $icon( $channel, 14 ), $allowed_svg ); ?></span><?php endforeach; ?></span>
-						<span class="pz-pop__amount">10<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+						<span class="pz-pop__amount"><?php echo esc_html( (string) $plan['costs']['chat_reply'] ); ?><?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
 					<div class="pz-pop__row"><span><?php echo esc_html( ucfirst( $name ) ); ?> answers in a live call</span><span class="pz-muted">voice or 3D</span><span class="pz-beta">BETA</span>
-						<span class="pz-pop__amount">20<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+						<span class="pz-pop__amount"><?php echo esc_html( (string) $plan['costs']['live_reply'] ); ?><?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
 					<div class="pz-pop__row"><span>New persona from one-click setup</span>
-						<span class="pz-pop__amount">100<?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
-					<p class="pz-muted">A conversation is usually 4 answers ≈ 40 credits.<?php echo $plan['resets'] !== '' ? ' Resets on ' . esc_html( $plan['resets'] ) . '.' : ''; ?></p>
+						<span class="pz-pop__amount"><?php echo esc_html( (string) $plan['costs']['create_persona'] ); ?><?php echo wp_kses( $coin( 14 ), $allowed_svg ); ?></span></div>
+					<p class="pz-muted">A conversation is usually 4 answers ≈ <?php echo esc_html( number_format_i18n( 4 * $plan['costs']['chat_reply'] ) ); ?> credits.<?php echo $plan['resets'] !== '' ? ' Resets on ' . esc_html( $plan['resets'] ) . '.' : ''; ?></p>
 				</div>
 				<div class="pz-pop pz-pop--knowledge" data-pz-popover="knowledge" role="dialog" aria-label="Knowledge units" hidden>
 					<div class="pz-pop__head"><span class="pz-pop__icon"><?php echo wp_kses( $icon( 'stack', 18 ), $allowed_svg ); ?></span><strong>Knowledge units</strong></div>

@@ -4,7 +4,7 @@ Tags: ai chatbot, chatbot, live chat, woocommerce, customer support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.5
+Stable tag: 3.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -160,6 +160,9 @@ Use **Disconnect** to clear every credential and setting the plugin stored, whil
 7. See your persona at work right in WordPress: connection, sync status and plan.
 
 == Changelog ==
+
+= 3.1.6 =
+* Credits are ten times smaller: an answer costs 1 credit, an answer in a live call 2, a new persona 10, and plans hold ten times fewer credits for the same price. The PERSONAIZER page now reads every price from your account, so it always shows the current ones.
 
 = 3.1.5 =
 * First release on WordPress.org, with screenshots, banners and an expanded FAQ. The plugin lives in the `personaizer-chat` folder and updates through WordPress.org; if you installed an earlier zip, deactivate and delete it, then install this one and connect again.

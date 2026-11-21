@@ -13,7 +13,7 @@ final class ContractsTest extends TestCase {
         $this->assertSame( 200, $start['status'] );
         $this->assertSame( '<guid>', Contracts::start_response( $start['response'] )['connect_id'] );
         // What the plugin sends at start is the profile + inventory shape this repo builds (Site\Profile, Site\Streams).
-        $this->assertSame( array( 'ka', 'en' ), $start['request']['site_profile']['audience_languages'] );
+        $this->assertSame( array( 'ka' ), $start['request']['site_profile']['audience_languages'] );
         $this->assertSame( array( 'stream_key', 'label', 'count', 'type' ), array_keys( $start['request']['inventory'][0] ) );
 
         $token = Contracts::token_response( pz_fixture( 'connect.token' )['response'] );
@@ -35,7 +35,7 @@ final class ContractsTest extends TestCase {
         $this->assertSame( 'Test Plan', $sync['plan']['name'] );
         $this->assertSame( 2000.0, $sync['plan']['knowledge_units_limit'] );
         $this->assertNull( $sync['plan']['credits_limit'], 'no credit ceiling reads as unlimited, never as 0' );
-        $this->assertSame( 40, $sync['plan']['credits_per_conversation'] );
+        $this->assertSame( array( 'chat_reply' => 1, 'live_reply' => 2, 'create_persona' => 10 ), $sync['plan']['credit_costs'] );
         $this->assertSame( 'USD', $sync['plan']['currency'] );
         $this->assertTrue( Contracts::has_headroom( $sync ) );
         $this->assertSame( array( 'pages', 'products' ), array_keys( $sync['streams'] ) );

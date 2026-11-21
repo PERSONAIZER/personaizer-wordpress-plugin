@@ -201,12 +201,13 @@ final class Page {
 	 * (units the persona holds of the plan's). Both bars are drawn to what was used; past a limit, the part over is
 	 * marked and the lines say how far over and what that means.
 	 *
-	 * @return array{name:string,gives:string,resets:string,conversations:array,knowledge:array}
+	 * @return array{name:string,gives:string,resets:string,costs:array,conversations:array,knowledge:array}
 	 */
 	private static function plan_view( array $plan, array $streams ) {
 		$resets = $plan['resets_at'] !== '' && strtotime( $plan['resets_at'] ) ? date_i18n( 'M j', strtotime( $plan['resets_at'] ) ) : '';
 		$paid   = $plan['monthly_price'] !== null && $plan['monthly_price'] > 0;
-		$per    = $plan['credits_per_conversation'];
+		// A conversation is about 4 replies; the price of one comes from the backend.
+		$per    = 4 * $plan['credit_costs']['chat_reply'];
 		$limit  = $plan['credits_limit'];
 		$used   = $plan['credits_used'];
 		$cap    = $plan['knowledge_units_limit'];
@@ -294,6 +295,7 @@ final class Page {
 			'name'          => $plan['name'],
 			'gives'         => implode( ' · ', $gives ),
 			'resets'        => $resets,
+			'costs'         => $plan['credit_costs'],
 			'conversations' => $conversations,
 			'knowledge'     => $knowledge,
 		);

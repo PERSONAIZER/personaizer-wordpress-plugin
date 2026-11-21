@@ -42,7 +42,11 @@
       "resets_at": null,
       "credits_used": 0,
       "credits_limit": null,
-      "credits_per_conversation": 40,
+      "credit_costs": {
+        "chat_reply": 1,
+        "live_reply": 2,
+        "create_persona": 10
+      },
       "knowledge_units_used": 120,
       "knowledge_units_limit": 2000
     },

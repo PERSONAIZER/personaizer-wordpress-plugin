@@ -65,6 +65,11 @@ final class Plugin {
 			return;
 		}
 		update_option( self::VERSION_OPTION, PERSONAIZER_VERSION, false );
+		// 3.1.6 reads the plan's credit_costs, which an answer cached by an earlier version doesn't have: ask again.
+		if ( $was !== '' && version_compare( $was, '3.1.6', '<' ) ) {
+			State::forget();
+			delete_option( Options::STATE_FALLBACK );
+		}
 		if ( ( $was === '' || version_compare( $was, '3.1.0', '<' ) ) && Options::is_connected() ) {
 			Outbox::clear();
 			Reconcile::forget();

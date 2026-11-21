@@ -43,7 +43,7 @@ final class Contracts {
 	 *   brand:array{id:string,name:string},
 	 *   persona:?array{id:string,name:string,avatar_url:string,building:bool},
 	 *   plan:?array{name:string,monthly_price:?float,currency:string,resets_at:string,credits_used:int,credits_limit:?int,
-	 *     credits_per_conversation:int,knowledge_units_used:float,knowledge_units_limit:?float},
+	 *     credit_costs:array{chat_reply:int,live_reply:int,create_persona:int},knowledge_units_used:float,knowledge_units_limit:?float},
 	 *   streams:array<string,array{enabled:bool,type:string,source_id:string,document_count:int,ready_count:int,failed_count:int,
 	 *     status:string,last_reconcile:?array}>
 	 * }
@@ -100,7 +100,12 @@ final class Contracts {
 				'credits_used'             => (int) ( $plan['credits_used'] ?? 0 ),
 				// null (not 0) = unlimited, like the knowledge limit below.
 				'credits_limit'            => isset( $plan['credits_limit'] ) ? (int) $plan['credits_limit'] : null,
-				'credits_per_conversation' => (int) ( $plan['credits_per_conversation'] ?? 0 ),
+				// What each action costs, from the backend; the page shows them and estimates conversations from them.
+				'credit_costs'             => array(
+					'chat_reply'     => (int) ( $plan['credit_costs']['chat_reply'] ?? 0 ),
+					'live_reply'     => (int) ( $plan['credit_costs']['live_reply'] ?? 0 ),
+					'create_persona' => (int) ( $plan['credit_costs']['create_persona'] ?? 0 ),
+				),
 				'knowledge_units_used'     => (float) ( $plan['knowledge_units_used'] ?? 0 ),
 				// null (not 0) = unlimited — an absent ceiling must never read as "no room".
 				'knowledge_units_limit'    => isset( $plan['knowledge_units_limit'] ) && $plan['knowledge_units_limit'] !== null
